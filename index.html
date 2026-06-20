@@ -901,7 +901,7 @@
             <div class="mt-2 flex justify-between items-center">
                 <span class="text-[10px] font-mono text-green-600" id="calendar-event-badge">✅ No events</span>
                 <div class="flex gap-2">
-
+                    <span class="text-primary underline text-[10px] font-mono cursor-pointer" onclick="fullGoogleCalendarSync(false)">↻ Sync Google</span>
                     <span class="text-primary underline text-[10px] font-mono cursor-pointer" onclick="calendarAddEvent()">+ Add Event</span>
                 </div>
             </div>
@@ -1891,55 +1891,110 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     // ── Google unified sign-in + permissions ──────────────────────
+    // Consent popup ONLY via startGoogleAuth() — never on page load.
     window.__googleAccessToken = '';
     const GOOGLE_SCOPES = 'openid profile email https://mail.google.com/ https://www.googleapis.com/auth/calendar';
 
-    function onGoogleAuth(response) {
-        if (response.error) { console.warn('[Google] Auth error:', response.error); return; }
-        // Decode ID token for user identity
-        let payload;
-        try { payload = JSON.parse(atob(response.id_token.split('.')[1])); }
-        catch(e) { console.warn('[Google] ID token parse failed', e); return; }
-        // Store access token for Gmail/Calendar API calls
-        window.__googleAccessToken = response.access_token || '';
+    function saveGoogleToken(response) {
+        if (!response?.access_token) return;
+        window.__googleAccessToken = response.access_token;
+        localStorage.setItem('ct_google_token', JSON.stringify({
+            access_token: response.access_token,
+            expires_at: Date.now() + (response.expires_in || 3600) * 1000
+        }));
+    }
+
+    function loadGoogleToken() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('ct_google_token') || 'null');
+            if (saved?.access_token && saved.expires_at > Date.now() + 30000) {
+                window.__googleAccessToken = saved.access_token;
+                return saved.access_token;
+            }
+        } catch (e) {}
+        window.__googleAccessToken = '';
+        return '';
+    }
+    window.loadGoogleToken = loadGoogleToken;
+
+    function fillSetupFormFromConfig(parsed) {
+        const fill = (id, val) => { const el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; };
+        fill('input-canteen', parsed.canteenName);
+        fill('input-location', parsed.location);
+        fill('input-students', parsed.avgStudents);
+        fill('input-staff', parsed.staffCount);
+        fill('input-efficiency', parsed.efficiencyGoal);
+        fill('input-open', parsed.openTime);
+        fill('input-close', parsed.closeTime);
+        fill('input-manager-name', parsed.managerName);
+        fill('input-manager-contact', parsed.managerContact);
+        fill('input-shelter', parsed.shelterName);
+        if (parsed.weeklyMenu) {
+            for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
+                fill('input-' + d, v);
+            }
+        }
+        fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
+        fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
+    }
+
+    function applyGoogleUserToUI(payload) {
         setupConfig.googleUser = payload;
         localStorage.setItem('ct_google_user', JSON.stringify(payload));
-        document.getElementById('gsi-status').classList.remove('hidden');
-        document.getElementById('gsi-email').textContent = payload.email;
-        document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
-        document.getElementById('gsi-error').classList.add('hidden');
-        console.log('[Google] Signed in as', payload.email, '| Gmail+Calendar:', !!response.access_token);
+        document.getElementById('gsi-status')?.classList.remove('hidden');
+        const emailEl = document.getElementById('gsi-email');
+        if (emailEl) emailEl.textContent = payload.email;
+        const wrapper = document.getElementById('gsi-button-wrapper');
+        if (wrapper) wrapper.innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
+        document.getElementById('gsi-error')?.classList.add('hidden');
+    }
 
-        // Restore previous setup config for this user (preserve googleUser)
-        const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
-        if (savedConfig) {
-            try {
-                const parsed = JSON.parse(savedConfig);
-                parsed.googleUser = payload; // keep current sign-in identity
-                Object.assign(setupConfig, parsed);
-                const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-                fill('input-canteen', parsed.canteenName);
-                fill('input-location', parsed.location);
-                fill('input-students', parsed.avgStudents);
-                fill('input-staff', parsed.staffCount);
-                fill('input-efficiency', parsed.efficiencyGoal);
-                fill('input-open', parsed.openTime);
-                fill('input-close', parsed.closeTime);
-                fill('input-manager-name', parsed.managerName);
-                fill('input-manager-contact', parsed.managerContact);
-                fill('input-shelter', parsed.shelterName);
-                if (parsed.weeklyMenu) {
-                    for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
-                        fill('input-' + d, v);
-                    }
-                }
-                fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
-                fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
-            } catch(e) { console.warn('[Google] Restore config failed', e); }
+    function restoreConfigForUser(email, userPayload) {
+        const savedConfig = localStorage.getItem('ct_setup_config_' + email);
+        if (!savedConfig) return;
+        try {
+            const parsed = JSON.parse(savedConfig);
+            parsed.googleUser = userPayload;
+            Object.assign(setupConfig, parsed);
+            fillSetupFormFromConfig(parsed);
+        } catch (e) { console.warn('[Google] Restore config failed', e); }
+    }
+
+    async function onGoogleTokenResponse(response) {
+        if (response.error) {
+            console.warn('[Google] Auth error:', response.error);
+            const errEl = document.getElementById('gsi-error');
+            if (errEl) { errEl.textContent = 'Sign-in failed: ' + response.error; errEl.classList.remove('hidden'); }
+            return;
         }
+        saveGoogleToken(response);
+        if (!response.access_token) return;
+
+        let payload;
+        try {
+            const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: 'Bearer ' + response.access_token }
+            });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            payload = await r.json();
+            if (!payload.email) throw new Error('No email in profile');
+        } catch (e) {
+            console.warn('[Google] Userinfo failed', e);
+            const errEl = document.getElementById('gsi-error');
+            if (errEl) { errEl.textContent = 'Could not load Google profile. Try again.'; errEl.classList.remove('hidden'); }
+            return;
+        }
+
+        applyGoogleUserToUI(payload);
+        console.log('[Google] Signed in as', payload.email, '| Gmail+Calendar token saved');
+        restoreConfigForUser(payload.email, payload);
+
         if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 500); }
-        // Auto-fetch Calendar events
-        setTimeout(() => { if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true); }, 1000);
+
+        setTimeout(async () => {
+            if (typeof fullGoogleCalendarSync === 'function') await fullGoogleCalendarSync(true);
+        }, 800);
+
         if (typeof terminalLog === 'function') terminalLog('[Google] Signed in — Gmail+Calendar ready', 'ok');
     }
 
@@ -1951,75 +2006,39 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             client_id: cid,
             scope: GOOGLE_SCOPES,
             prompt: 'consent',
-            callback: onGoogleAuth
+            callback: onGoogleTokenResponse
         }).requestAccessToken();
     }
+    window.startGoogleAuth = startGoogleAuth;
 
     function restoreGoogleSession() {
+        loadGoogleToken();
         const saved = localStorage.getItem('ct_google_user');
         if (!saved) return;
         try {
             const user = JSON.parse(saved);
-            setupConfig.googleUser = user;
-            document.getElementById('gsi-status').classList.remove('hidden');
-            document.getElementById('gsi-email').textContent = user.email;
-            document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
-            document.getElementById('gsi-error').classList.add('hidden');
-            const savedConfig = localStorage.getItem('ct_setup_config_' + user.email);
-            if (savedConfig) {
-                try {
-                    const parsed = JSON.parse(savedConfig);
-                    parsed.googleUser = user; // keep current sign-in identity
-                    Object.assign(setupConfig, parsed);
-                    const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-                    fill('input-canteen', parsed.canteenName);
-                    fill('input-location', parsed.location);
-                    fill('input-students', parsed.avgStudents);
-                    fill('input-staff', parsed.staffCount);
-                    fill('input-efficiency', parsed.efficiencyGoal);
-                    fill('input-open', parsed.openTime);
-                    fill('input-close', parsed.closeTime);
-                    fill('input-manager-name', parsed.managerName);
-                    fill('input-manager-contact', parsed.managerContact);
-                    fill('input-shelter', parsed.shelterName);
-                    if (parsed.weeklyMenu) {
-                        for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
-                            fill('input-' + d, v);
-                        }
-                    }
-                } catch(e) { console.warn('[Google] Config restore failed', e); }
+            applyGoogleUserToUI(user);
+            restoreConfigForUser(user.email, user);
+            if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 300); }
+            if (window.__googleAccessToken && typeof fullGoogleCalendarSync === 'function') {
+                setTimeout(() => fullGoogleCalendarSync(true), 2500);
             }
-            if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 500); }
-            // Try silent token refresh
-            setTimeout(() => {
-                const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-                if (cid && typeof google !== 'undefined' && google.accounts?.oauth2) {
-                    google.accounts.oauth2.initTokenClient({
-                        client_id: cid, scope: GOOGLE_SCOPES, prompt: '',
-                        callback: (r) => { if (r.access_token) window.__googleAccessToken = r.access_token; }
-                    }).requestAccessToken();
-                }
-            }, 1500);
-        } catch(e) { console.warn('[Google] Session restore failed', e); }
+        } catch (e) { console.warn('[Google] Session restore failed', e); }
     }
 
     function initGoogleSignIn() {
         const wrapper = document.getElementById('gsi-button-wrapper');
         const gsiContainer = document.getElementById('gsi-container');
-        if(!wrapper || !gsiContainer) return;
-        let clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+        if (!wrapper || !gsiContainer) return;
+        const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
         restoreGoogleSession();
-        if(!clientId) {
+        if (!clientId) {
             gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
             if (!window._gsiRetried) { window._gsiRetried = true; setTimeout(initGoogleSignIn, 2000); }
             return;
         }
-        if (setupConfig?.googleUser) {
-            setTimeout(() => { if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true); }, 500);
-            return;
-        }
-        // Render custom sign-in button
-        wrapper.innerHTML = '<button onclick="startGoogleAuth()" class="gsi-material-button"><div class="gsi-material-button-state"></div><div class="gsi-material-button-content-wrapper"><div class="gsi-material-button-icon"><svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg></div><span class="gsi-material-button-text">Sign in with Google</span></div></button>';
+        if (setupConfig?.googleUser) return;
+        wrapper.innerHTML = '<button type="button" onclick="startGoogleAuth()" class="gsi-material-button"><div class="gsi-material-button-state"></div><div class="gsi-material-button-content-wrapper"><div class="gsi-material-button-icon"><svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg></div><span class="gsi-material-button-text">Sign in with Google</span></div></button>';
     }
 
     setTimeout(initGoogleSignIn, 300);
@@ -2451,15 +2470,22 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         setTimeout(() => document.getElementById('ee-input')?.focus(), 100);
     }
 
-    function saveEventEditor(dateKey) {
+    async function saveEventEditor(dateKey) {
         const input = document.getElementById('ee-input');
         const title = input ? input.value.trim() : '';
         if (!title) { document.getElementById('calendar-event-editor')?.remove(); return; }
-        calendarEvents.push({ date: dateKey, title });
+        const ev = { date: dateKey, title };
+        calendarEvents.push(ev);
         localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
         renderCalendar();
         document.getElementById('calendar-event-editor')?.remove();
-        if (setupConfig?.googleUser) syncToGoogleCalendar(dateKey, title);
+        if (setupConfig?.googleUser && (window.__googleAccessToken || loadGoogleToken())) {
+            const result = await syncToGoogleCalendar(dateKey, title);
+            if (result.synced && result.googleId) {
+                ev.googleId = result.googleId;
+                localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+            }
+        }
     }
 
     function calendarAddEvent() {
@@ -2475,10 +2501,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function syncToGoogleCalendar(date, title) {
-        // Use pre-fetched Google token only (granted during sign-in in wizard)
-        let accessToken = window.__googleAccessToken || '';
-        // Try direct Calendar API first, fall back to proxy
+        let accessToken = window.__googleAccessToken || loadGoogleToken();
         let synced = false;
+        let googleId = null;
         if (accessToken) {
             try {
                 const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
@@ -2487,9 +2512,12 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                     body: JSON.stringify({ summary: title || 'CanteenTycoon Event', start: { date }, end: { date } })
                 });
                 const d = await r.json();
-                if (r.ok) { synced = true; if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced ✓', 'ok'); }
-                else if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct API failed (' + (d.error?.message || r.status) + '), trying proxy...', 'warn');
-            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct call error, trying proxy...', 'warn'); }
+                if (r.ok) {
+                    synced = true;
+                    googleId = d.id;
+                    if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced ✓', 'ok');
+                } else if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct API failed (' + (d.error?.message || r.status) + '), trying proxy...', 'warn');
+            } catch (e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct call error, trying proxy...', 'warn'); }
         }
         if (!synced) {
             try {
@@ -2501,15 +2529,40 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
-                if (data.ok) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced via proxy ✓', 'ok'); }
-                else { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy failed: ' + (data.error || 'unknown'), 'err'); }
-            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy error: ' + e.message, 'err'); }
+                if (data.ok) {
+                    synced = true;
+                    googleId = data.id;
+                    if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced via proxy ✓', 'ok');
+                } else if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy failed: ' + (data.error || 'unknown'), 'err');
+            } catch (e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy error: ' + e.message, 'err'); }
         }
+        return { synced, googleId };
+    }
+
+    async function pushLocalEventsToGoogle() {
+        const accessToken = window.__googleAccessToken || loadGoogleToken();
+        if (!accessToken) return 0;
+        let pushed = 0;
+        for (const ev of calendarEvents) {
+            if (!ev.date || !ev.title || ev.googleId) continue;
+            const existsOnGoogle = calendarEvents.some(e => e.date === ev.date && e.title.toLowerCase() === ev.title.toLowerCase() && e.googleId && e !== ev);
+            if (existsOnGoogle) continue;
+            const result = await syncToGoogleCalendar(ev.date, ev.title);
+            if (result.synced) {
+                ev.googleId = result.googleId;
+                pushed++;
+            }
+        }
+        if (pushed > 0) localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+        return pushed;
     }
 
     async function fetchFromGoogleCalendar(silent) {
-        // Use pre-fetched Google token only (granted during sign-in in wizard)
-        let accessToken = window.__googleAccessToken || '';
+        let accessToken = window.__googleAccessToken || loadGoogleToken();
+        if (!accessToken) {
+            if (!silent && typeof terminalLog === 'function') terminalLog('[Calendar] Sign in with Google (Setup wizard) to sync calendar', 'warn');
+            return;
+        }
         // Try direct Calendar API first, then proxy
         let items = [];
         if (accessToken) {
@@ -2521,7 +2574,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 if (r.ok && d.items) {
                     items = d.items.map(e => {
                         const s = (e.start?.date || e.start?.dateTime || '').substring(0, 10);
-                        return s && e.summary ? { date: s, title: e.summary.trim(), id: e.id } : null;
+                        return s && e.summary ? { date: s, title: e.summary.trim(), googleId: e.id } : null;
                     }).filter(Boolean);
                 }
             } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct fetch failed, trying proxy...', 'warn'); }
@@ -2544,7 +2597,13 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             items.forEach(item => {
                 if (item.date && item.title) {
                     const exists = calendarEvents.some(e => e.date === item.date && e.title.toLowerCase() === item.title.toLowerCase());
-                    if (!exists) { calendarEvents.push({ date: item.date, title: item.title }); addedCount++; }
+                    if (!exists) {
+                        calendarEvents.push({ date: item.date, title: item.title, googleId: item.googleId || item.id });
+                        addedCount++;
+                    } else {
+                        const local = calendarEvents.find(e => e.date === item.date && e.title.toLowerCase() === item.title.toLowerCase());
+                        if (local && (item.googleId || item.id) && !local.googleId) local.googleId = item.googleId || item.id;
+                    }
                 }
             });
             if (addedCount > 0) {
@@ -2556,7 +2615,23 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             }
         } else if (typeof terminalLog === 'function') terminalLog('[Calendar] No events fetched.', 'info');
     }
+
+    async function fullGoogleCalendarSync(silent) {
+        const token = window.__googleAccessToken || loadGoogleToken();
+        if (!token) {
+            if (!silent && typeof terminalLog === 'function') {
+                terminalLog('[Calendar] No Google token — open Setup and click Sign in with Google', 'warn');
+            }
+            return;
+        }
+        await fetchFromGoogleCalendar(true);
+        const pushed = await pushLocalEventsToGoogle();
+        if (typeof terminalLog === 'function') {
+            terminalLog('[Calendar] Full sync complete' + (pushed ? ` (${pushed} pushed to Google)` : ''), 'ok');
+        }
+    }
     window.fetchFromGoogleCalendar = fetchFromGoogleCalendar;
+    window.fullGoogleCalendarSync = fullGoogleCalendarSync;
 
     // ── Canteen Settings Modal ─────────────────────────────────────
     window.openCanteenSettings = function() {
@@ -2720,6 +2795,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 <script src="js/agents.js?v=20260620aa"></script>
 <script src="js/npc.js?v=20260620aa"></script>
 <script src="js/simulation.js?v=20260620aa"></script>
-<script src="js/ui.js?v=20260620aa"></script>
+<script src="js/ui.js?v=20260620ab"></script>
 </body>
 </html>

@@ -776,8 +776,12 @@ async function confirmSendEmail() {
   if (!to) { terminalLog('EMAIL: No recipient email address', 'err'); return; }
   const fromEmail = setupConfig?.googleUser?.email || setupConfig?.managerContact || '';
 
-  // Use pre-fetched Google token only (granted during sign-in in wizard)
-  let accessToken = window.__googleAccessToken || '';
+  let accessToken = window.__googleAccessToken || (typeof loadGoogleToken === 'function' ? loadGoogleToken() : '');
+  if (!accessToken) {
+    terminalLog('EMAIL: Not signed in to Google — open Setup wizard and click Sign in with Google first', 'err');
+    appendChatMessage('assistant', '⚠️ **Gmail not connected.** Open the Setup wizard (or re-open from welcome) and click **Sign in with Google** to grant Gmail permission, then try Send Dispatch again.');
+    return;
+  }
 
   closeEmailApproval();
 
