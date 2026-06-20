@@ -777,6 +777,7 @@ async function confirmSendEmail() {
   const fromEmail = setupConfig?.googleUser?.email || setupConfig?.managerContact || '';
 
   let accessToken = window.__googleAccessToken || (typeof loadGoogleToken === 'function' ? loadGoogleToken() : '');
+  if (!accessToken && typeof ensureGoogleToken === 'function') accessToken = await ensureGoogleToken();
   if (!accessToken) {
     terminalLog('EMAIL: Not signed in to Google — open Setup wizard and click Sign in with Google first', 'err');
     appendChatMessage('assistant', '⚠️ **Gmail not connected.** Open the Setup wizard (or re-open from welcome) and click **Sign in with Google** to grant Gmail permission, then try Send Dispatch again.');

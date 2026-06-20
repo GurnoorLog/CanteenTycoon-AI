@@ -1917,6 +1917,29 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
     window.loadGoogleToken = loadGoogleToken;
 
+    window.__googleTokenPromise = null;
+    async function ensureGoogleToken() {
+        const cached = loadGoogleToken();
+        if (cached) return cached;
+        if (window.__googleTokenPromise) return window.__googleTokenPromise;
+        window.__googleTokenPromise = new Promise(resolve => {
+            const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+            if (!cid || typeof google === 'undefined' || !google.accounts?.oauth2) { resolve(''); return; }
+            try {
+                google.accounts.oauth2.initTokenClient({
+                    client_id: cid, scope: GOOGLE_SCOPES, prompt: '',
+                    callback: r => {
+                        if (r.access_token) { saveGoogleToken(r); resolve(r.access_token); }
+                        else { resolve(''); }
+                        window.__googleTokenPromise = null;
+                    }
+                }).requestAccessToken();
+            } catch(e) { resolve(''); window.__googleTokenPromise = null; }
+        });
+        return window.__googleTokenPromise;
+    }
+    window.ensureGoogleToken = ensureGoogleToken;
+
     function fillSetupFormFromConfig(parsed) {
         const fill = (id, val) => { const el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; };
         fill('input-canteen', parsed.canteenName);
@@ -2502,6 +2525,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
     async function syncToGoogleCalendar(date, title) {
         let accessToken = window.__googleAccessToken || loadGoogleToken();
+        if (!accessToken) accessToken = await ensureGoogleToken();
         let synced = false;
         let googleId = null;
         if (accessToken) {
@@ -2540,7 +2564,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function pushLocalEventsToGoogle() {
-        const accessToken = window.__googleAccessToken || loadGoogleToken();
+        let accessToken = window.__googleAccessToken || loadGoogleToken();
+        if (!accessToken) accessToken = await ensureGoogleToken();
         if (!accessToken) return 0;
         let pushed = 0;
         for (const ev of calendarEvents) {
@@ -2559,6 +2584,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
     async function fetchFromGoogleCalendar(silent) {
         let accessToken = window.__googleAccessToken || loadGoogleToken();
+        if (!accessToken) accessToken = await ensureGoogleToken();
         if (!accessToken) {
             if (!silent && typeof terminalLog === 'function') terminalLog('[Calendar] Sign in with Google (Setup wizard) to sync calendar', 'warn');
             return;
@@ -2617,10 +2643,10 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function fullGoogleCalendarSync(silent) {
-        const token = window.__googleAccessToken || loadGoogleToken();
+        const token = await ensureGoogleToken();
         if (!token) {
             if (!silent && typeof terminalLog === 'function') {
-                terminalLog('[Calendar] No Google token — open Setup and click Sign in with Google', 'warn');
+                terminalLog('[Calendar] No Google token — click Sign in with Google in the Setup wizard', 'warn');
             }
             return;
         }
