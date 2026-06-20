@@ -1444,6 +1444,14 @@ __loadEnv();
         setupConfig.shelterName = shelter;
         setupConfig.cafeteriaPhoto = photoInput.files[0];
 
+        // Save config per Google user (for auto-restore on next sign-in)
+        const googleEmail = setupConfig?.googleUser?.email;
+        if (googleEmail) {
+            const saveable = { ...setupConfig, cafeteriaPhoto: null, googleUser: null };
+            localStorage.setItem('ct_setup_config_' + googleEmail, JSON.stringify(saveable));
+            console.log('[Google] Saved config for', googleEmail);
+        }
+
         console.log('[Setup] Config saved:', setupConfig);
 
         // Hide wizard, show AI intro chat
@@ -1778,6 +1786,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         try {
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
             setupConfig.googleUser = payload;
+            // Persist sign-in state
+            localStorage.setItem('ct_google_user', JSON.stringify(payload));
+
             document.getElementById('gsi-status').classList.remove('hidden');
             document.getElementById('gsi-email').textContent = payload.email;
             document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
@@ -1788,9 +1799,38 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             const syncBtn = document.getElementById('calendar-google-sync');
             if (syncBtn) syncBtn.classList.remove('hidden');
             
-            // Auto-fetch events on sign-in
+            // Restore previous setup config for this user
+            const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
+            if (savedConfig) {
+                try {
+                    const parsed = JSON.parse(savedConfig);
+                    Object.assign(setupConfig, parsed);
+                    console.log('[Google] Restored config for', payload.email);
+                    // Pre-fill wizard fields if they exist
+                    const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                    fill('input-canteen', parsed.canteenName);
+                    fill('input-location', parsed.location);
+                    fill('input-students', parsed.avgStudents);
+                    fill('input-staff', parsed.staffCount);
+                    fill('input-efficiency', parsed.efficiencyGoal);
+                    fill('input-open', parsed.openTime);
+                    fill('input-close', parsed.closeTime);
+                    fill('input-manager-name', parsed.managerName);
+                    fill('input-manager-contact', parsed.managerContact);
+                    fill('input-shelter', parsed.shelterName);
+                    if (parsed.weeklyMenu) {
+                        for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
+                            fill('input-' + d, v);
+                        }
+                    }
+                    fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
+                    fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
+                } catch(e) { console.warn('[Google] Restore config failed', e); }
+            }
+
+            // Auto-fetch Calendar events silently (no popup if already granted)
             setTimeout(() => {
-                if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar();
+                if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
             }, 1000);
         } catch(e) {
             console.warn('[Google] Token parse failed', e);
@@ -1799,14 +1839,41 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
     let _gsiInitialized = false;
 
+    function restoreGoogleSession() {
+        const saved = localStorage.getItem('ct_google_user');
+        if (!saved) return;
+        try {
+            const user = JSON.parse(saved);
+            setupConfig.googleUser = user;
+            document.getElementById('gsi-status').classList.remove('hidden');
+            document.getElementById('gsi-email').textContent = user.email;
+            document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
+            document.getElementById('gsi-error').classList.add('hidden');
+            const syncBtn = document.getElementById('calendar-google-sync');
+            if (syncBtn) syncBtn.classList.remove('hidden');
+            console.log('[Google] Restored session for', user.email);
+        } catch(e) { console.warn('[Google] Session restore failed', e); }
+    }
+
     function initGoogleSignIn() {
         const wrapper = document.getElementById('gsi-button-wrapper');
         const gsiContainer = document.getElementById('gsi-container');
         if(!wrapper || !gsiContainer) return;
         const clientId = localStorage.getItem('ct_google_client_id') || window.__ENV?.GOOGLE_CLIENT_ID || '';
+
+        // Restore previous session if exists
+        restoreGoogleSession();
+
         if(!clientId) {
             gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
             _gsiInitialized = false;
+            return;
+        }
+
+        // If already signed in and button hidden, don't re-render button
+        if (setupConfig?.googleUser) {
+            if (_gsiInitialized) return;
+            _gsiInitialized = true;
             return;
         }
 
@@ -2297,7 +2364,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         } catch (_) { }
     }
 
-    function fetchFromGoogleCalendar() {
+    function fetchFromGoogleCalendar(silent) {
         if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) {
             if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync calendar: Not signed in or SDK not loaded', 'warn');
             return;
@@ -2309,9 +2376,18 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             const tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
                 scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events',
+                prompt: silent ? '' : 'consent',
                 callback: async (resp) => {
                     if (resp.access_token) {
-                        if (typeof terminalLog === 'function') terminalLog('[Google] Token acquired. Fetching events...', 'run');
+                        if (resp.error) {
+                            if (typeof terminalLog === 'function') terminalLog('[Google] Silent token refresh failed (normal on first time): ' + resp.error, 'warn');
+                            // If silent failed, try with prompt
+                            if (silent) {
+                                setTimeout(() => fetchFromGoogleCalendar(false), 500);
+                            }
+                            return;
+                        }
+                        if (typeof terminalLog === 'function') terminalLog('[Google] Token acquired, fetching events...', 'run');
                         try {
                             const now = new Date();
                             const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
