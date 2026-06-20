@@ -571,6 +571,7 @@
                         <p class="font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Sign in with Google</p>
                         <div id="gsi-button-wrapper" class="flex justify-center"></div>
                         <p id="gsi-status" class="font-body-md text-sm text-on-surface-variant mt-xs hidden">Signed in as <span id="gsi-email"></span></p>
+                        <button id="gsi-grant-btn" onclick="requestGooglePermissions()" class="mt-xs w-full bg-indigo-500 text-white pixel-border px-3 py-1.5 text-[11px] font-bold uppercase hover:bg-indigo-600 hidden">🔑 Grant Gmail & Calendar Access</button>
                         <p id="gsi-error" class="font-body-md text-sm text-secondary mt-xs hidden"></p>
                         <input type="hidden" id="input-google-token"/>
                     </div>
@@ -1872,6 +1873,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     async function requestGooglePermissions() {
         const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
         if (!cid || !setupConfig?.googleUser || typeof google === 'undefined' || !google.accounts?.oauth2) return;
+        const btn = document.getElementById('gsi-grant-btn');
+        if (btn) { btn.textContent = '⏳ Requesting...'; btn.disabled = true; }
         try {
             const token = await new Promise((res, rej) => {
                 try {
@@ -1881,17 +1884,16 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                         prompt: 'consent',
                         callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
                     });
-                    if (typeof sendNotification === 'function') {
-                        sendNotification('🔑 Google Permissions', 'One popup will ask for Gmail + Calendar access.', 'high');
-                    }
                     tc.requestAccessToken();
                 } catch(e) { rej(e.message); }
             });
             window.__googleAccessToken = token;
-            console.log('[Google] Gmail + Calendar permissions granted ✓');
+            if (btn) { btn.textContent = '✅ Gmail & Calendar Granted'; btn.classList.add('bg-green-600', 'hover:bg-green-700'); btn.classList.remove('bg-indigo-500', 'hover:bg-indigo-600'); btn.disabled = true; }
             if (typeof terminalLog === 'function') terminalLog('[Google] Gmail + Calendar tokens ready', 'ok');
+            console.log('[Google] Gmail + Calendar permissions granted ✓');
         } catch(e) {
             console.warn('[Google] Permission request failed:', e);
+            if (btn) { btn.textContent = '🔑 Grant Gmail & Calendar Access (retry)'; btn.disabled = false; }
         }
     }
 
@@ -1946,13 +1948,13 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 setTimeout(skipToDesktop, 500);
             }
 
+            // Show grant button — user clicks it (real gesture) → popup not blocked
+            document.getElementById('gsi-grant-btn')?.classList.remove('hidden');
+
             // Auto-fetch Calendar events silently (no popup if already granted)
             setTimeout(() => {
                 if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
             }, 1000);
-
-            // Request Gmail + Calendar permissions immediately after sign-in
-            setTimeout(requestGooglePermissions, 2000);
         } catch(e) {
             console.warn('[Google] Token parse failed', e);
         }
@@ -1999,18 +2001,29 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             if (setupConfig.wizardComplete) {
                 setTimeout(skipToDesktop, 500);
             }
-            // Request Gmail + Calendar permissions silently (no popup if already granted)
-            setTimeout(() => {
+            // Try silent token refresh (no popup if already granted)
+            setTimeout(async () => {
                 const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
                 if (cid && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
-                    google.accounts.oauth2.initTokenClient({
-                        client_id: cid,
-                        scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
-                        prompt: '',
-                        callback: (r) => { if (r.access_token) window.__googleAccessToken = r.access_token; }
-                    }).requestAccessToken();
+                    try {
+                        const token = await new Promise((res, rej) => {
+                            google.accounts.oauth2.initTokenClient({
+                                client_id: cid,
+                                scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
+                                prompt: '',
+                                callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
+                            }).requestAccessToken();
+                        });
+                        window.__googleAccessToken = token;
+                        const gb = document.getElementById('gsi-grant-btn');
+                        if (gb) { gb.textContent = '✅ Gmail & Calendar Granted'; gb.classList.add('bg-green-600'); gb.classList.remove('bg-indigo-500', 'hover:bg-indigo-600'); gb.disabled = true; }
+                    } catch(e) {
+                        // Silent refresh failed — show grant button for user click
+                        const gb = document.getElementById('gsi-grant-btn');
+                        if (gb) gb.classList.remove('hidden');
+                    }
                 }
-            }, 2000);
+            }, 1500);
             console.log('[Google] Restored session for', user.email);
         } catch(e) { console.warn('[Google] Session restore failed', e); }
     }
