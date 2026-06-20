@@ -782,18 +782,24 @@ async function confirmSendEmail() {
     try {
       const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
       if (cid) {
-        const token = await new Promise((res, rej) => {
+        const getToken = (prompt) => new Promise((res, rej) => {
           try {
             const tc = google.accounts.oauth2.initTokenClient({
               client_id: cid,
               scope: 'https://www.googleapis.com/auth/gmail.send',
-              prompt: '',
+              prompt,
               callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
             });
+            if (prompt === 'consent') sendNotification('⏳ Gmail Permission', 'A Google popup will ask you to grant email sending permission.', 'high');
             tc.requestAccessToken();
           } catch(e) { rej(e.message); }
         });
-        accessToken = token;
+        // Try silent first, then consent
+        try { accessToken = await getToken(''); }
+        catch(e) {
+          terminalLog('[Google] Silent Gmail token failed, requesting consent...', 'warn');
+          accessToken = await getToken('consent');
+        }
       }
     } catch(e) { terminalLog('[Google] Gmail token: ' + e, 'warn'); }
   }

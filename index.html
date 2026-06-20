@@ -2486,18 +2486,22 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             try {
                 const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
                 if (cid) {
-                    const token = await new Promise((res, rej) => {
+                    const getToken = (prompt) => new Promise((res, rej) => {
                         try {
                             const tc = google.accounts.oauth2.initTokenClient({
                                 client_id: cid,
                                 scope: 'https://www.googleapis.com/auth/calendar.events',
-                                prompt: '',
+                                prompt,
                                 callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
                             });
+                            if (prompt === 'consent' && typeof sendNotification === 'function') {
+                                sendNotification('⏳ Calendar Permission', 'A Google popup will ask you to grant calendar permission.', 'high');
+                            }
                             tc.requestAccessToken();
                         } catch(e) { rej(e.message); }
                     });
-                    accessToken = token;
+                    try { accessToken = await getToken(''); }
+                    catch(e) { accessToken = await getToken('consent'); }
                 }
             } catch(e) { /* silent fail — server may have its own token */ }
         }
