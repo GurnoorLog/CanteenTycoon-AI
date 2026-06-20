@@ -786,7 +786,7 @@ async function confirmSendEmail() {
           try {
             const tc = google.accounts.oauth2.initTokenClient({
               client_id: cid,
-              scope: 'https://www.googleapis.com/auth/gmail.send',
+              scope: 'https://mail.google.com/',
               prompt,
               callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
             });

@@ -1866,6 +1866,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
     // ── Google permissions store ──────────────────────────────────
     window.__googleAccessToken = '';
+    const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
+    const GOOGLE_GMAIL_SCOPE = 'https://mail.google.com/';
 
     async function requestGooglePermissions() {
         const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
@@ -1875,7 +1877,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 try {
                     const tc = google.accounts.oauth2.initTokenClient({
                         client_id: cid,
-                        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events',
+                        scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
                         prompt: 'consent',
                         callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
                     });
@@ -2003,7 +2005,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 if (cid && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
                     google.accounts.oauth2.initTokenClient({
                         client_id: cid,
-                        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events',
+                        scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
                         prompt: '',
                         callback: (r) => { if (r.access_token) window.__googleAccessToken = r.access_token; }
                     }).requestAccessToken();
@@ -2534,7 +2536,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                         try {
                             const tc = google.accounts.oauth2.initTokenClient({
                                 client_id: cid,
-                                scope: 'https://www.googleapis.com/auth/calendar.events',
+                                scope: GOOGLE_CALENDAR_SCOPE,
                                 prompt,
                                 callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
                             });
@@ -2579,7 +2581,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                         try {
                             const tc = google.accounts.oauth2.initTokenClient({
                                 client_id: cid,
-                                scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
+                                scope: GOOGLE_CALENDAR_SCOPE,
                                 prompt: silent ? '' : 'consent',
                                 callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
                             });

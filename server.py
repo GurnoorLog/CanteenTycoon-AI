@@ -22,8 +22,8 @@ except ImportError:
     GOOGLE_AUTH_FLOW_AVAILABLE = False
 
 GMAIL_CALENDAR_SCOPES = [
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/calendar.events",
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/calendar",
 ]
 
 # Build a Google Calendar API service using the same OAuth2 refresh token
