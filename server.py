@@ -267,7 +267,16 @@ class ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 if __name__ == "__main__":
+    import subprocess, sys
+    # Start ML server (app.py) in a subprocess
+    ml_proc = subprocess.Popen([sys.executable, "app.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"[SERVER] ML server started (PID {ml_proc.pid})", flush=True)
+
     port = int(os.environ.get("PORT", 8080))
     server = ThreadingHTTPServer(("0.0.0.0", port), ProxyHandler)
-    print(f"Serving at http://localhost:{port} (multi-threaded)")
+    print(f"Serving at http://localhost:{port} (multi-threaded)", flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        ml_proc.terminate()
     server.serve_forever()
