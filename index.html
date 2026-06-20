@@ -2498,22 +2498,33 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 }
             } catch(e) { /* silent fail — server may have its own token */ }
         }
-        try {
-            const payload = { action: 'create', date, title };
-            if (accessToken) payload.access_token = accessToken;
-            const res = await fetch('/proxy/calendar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.ok) {
-                if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced ✓', 'ok');
-            } else {
-                if (typeof terminalLog === 'function') terminalLog('[Calendar] Sync failed: ' + (data.error || 'unknown'), 'err');
-            }
-        } catch(e) {
-            if (typeof terminalLog === 'function') terminalLog('[Calendar] Sync error: ' + e.message, 'err');
+        // Try direct Calendar API first, fall back to proxy
+        let synced = false;
+        if (accessToken) {
+            try {
+                const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ summary: title || 'CanteenTycoon Event', start: { date }, end: { date } })
+                });
+                const d = await r.json();
+                if (r.ok) { synced = true; if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced ✓', 'ok'); }
+                else if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct API failed (' + (d.error?.message || r.status) + '), trying proxy...', 'warn');
+            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct call error, trying proxy...', 'warn'); }
+        }
+        if (!synced) {
+            try {
+                const payload = { action: 'create', date, title };
+                if (accessToken) payload.access_token = accessToken;
+                const res = await fetch('/proxy/calendar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.ok) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Event synced via proxy ✓', 'ok'); }
+                else { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy failed: ' + (data.error || 'unknown'), 'err'); }
+            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy error: ' + e.message, 'err'); }
         }
     }
 
@@ -2541,36 +2552,51 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 if (silent) { /* retry handled silently */ }
             }
         }
-        try {
-            const payload = { action: 'list' };
-            if (accessToken) payload.access_token = accessToken;
-            const res = await fetch('/proxy/calendar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.ok && data.items) {
-                let addedCount = 0;
-                data.items.forEach(item => {
-                    if (item.date && item.title) {
-                        const exists = calendarEvents.some(e => e.date === item.date && e.title.toLowerCase() === item.title.toLowerCase());
-                        if (!exists) { calendarEvents.push({ date: item.date, title: item.title }); addedCount++; }
-                    }
+        // Try direct Calendar API first, then proxy
+        let items = [];
+        if (accessToken) {
+            try {
+                const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=100&singleEvents=true&orderBy=startTime', {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
                 });
-                if (addedCount > 0) {
-                    localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
-                    renderCalendar();
-                    if (typeof terminalLog === 'function') terminalLog(`[Calendar] Synced ${addedCount} event(s) from Google Calendar!`, 'ok');
-                } else {
-                    if (typeof terminalLog === 'function') terminalLog('[Calendar] Up-to-date.', 'ok');
+                const d = await r.json();
+                if (r.ok && d.items) {
+                    items = d.items.map(e => {
+                        const s = (e.start?.date || e.start?.dateTime || '').substring(0, 10);
+                        return s && e.summary ? { date: s, title: e.summary.trim(), id: e.id } : null;
+                    }).filter(Boolean);
                 }
-            } else {
-                if (typeof terminalLog === 'function') terminalLog('[Calendar] Fetch: ' + (data.error || 'no data'), 'warn');
-            }
-        } catch(e) {
-            if (typeof terminalLog === 'function') terminalLog('[Calendar] Fetch error: ' + e.message, 'err');
+            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Direct fetch failed, trying proxy...', 'warn'); }
         }
+        if (!items.length) {
+            try {
+                const payload = { action: 'list' };
+                if (accessToken) payload.access_token = accessToken;
+                const res = await fetch('/proxy/calendar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.ok && data.items) items = data.items;
+            } catch(e) { if (typeof terminalLog === 'function') terminalLog('[Calendar] Proxy fetch error: ' + e.message, 'err'); }
+        }
+        if (items.length) {
+            let addedCount = 0;
+            items.forEach(item => {
+                if (item.date && item.title) {
+                    const exists = calendarEvents.some(e => e.date === item.date && e.title.toLowerCase() === item.title.toLowerCase());
+                    if (!exists) { calendarEvents.push({ date: item.date, title: item.title }); addedCount++; }
+                }
+            });
+            if (addedCount > 0) {
+                localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+                renderCalendar();
+                if (typeof terminalLog === 'function') terminalLog('[Calendar] Synced ' + addedCount + ' event(s) from Google!', 'ok');
+            } else {
+                if (typeof terminalLog === 'function') terminalLog('[Calendar] Up-to-date.', 'ok');
+            }
+        } else if (typeof terminalLog === 'function') terminalLog('[Calendar] No events fetched.', 'info');
     }
     window.fetchFromGoogleCalendar = fetchFromGoogleCalendar;
 

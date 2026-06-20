@@ -809,24 +809,50 @@ async function confirmSendEmail() {
   const win = document.getElementById('win-prediction-paper');
   if(win) win.classList.add('hidden');
 
-  // Send the email
-  try {
-    const payload = { to, subject, body, from_email: fromEmail };
-    if (accessToken) payload.access_token = accessToken;
-    const res = await fetch('/proxy/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-    if (result.sent) {
-      terminalLog(`EMAIL: Dispatch notice sent to ${to} (${result.simulated ? 'simulated' : 'delivered'})`, 'ok');
-      sendNotification('📧 Dispatch Email Sent', `Surplus notice dispatched to ${to}`, 'high');
-    } else {
-      terminalLog(`EMAIL: Failed - ${result.error}`, 'err');
+  // Send the email — try direct Gmail API first (browser has access_token), fall back to proxy
+  let sent = false;
+  if (accessToken) {
+    try {
+      const raw = [
+        'Content-Type: text/plain; charset="UTF-8"',
+        'MIME-Version: 1.0',
+        'Content-Transfer-Encoding: 7bit',
+        'To: ' + to,
+        'Subject: ' + subject,
+        'From: ' + fromEmail,
+        '',
+        body
+      ].join('\r\n');
+      const b64 = btoa(unescape(encodeURIComponent(raw))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: b64 })
+      });
+      const d = await r.json();
+      if (r.ok) { sent = true; terminalLog('EMAIL: Sent via direct Gmail API ✓', 'ok'); sendNotification('📧 Dispatch Email Sent', 'Surplus notice dispatched to ' + to, 'high'); }
+      else { terminalLog('EMAIL: Direct Gmail API failed (' + (d.error?.message || r.status) + '), trying proxy...', 'warn'); }
+    } catch(e) { terminalLog('EMAIL: Direct call error, trying proxy...', 'warn'); }
+  }
+  if (!sent) {
+    try {
+      const payload = { to, subject, body, from_email: fromEmail };
+      if (accessToken) payload.access_token = accessToken;
+      const res = await fetch('/proxy/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (result.sent) {
+        terminalLog('EMAIL: Dispatch notice sent to ' + to + ' (' + (result.simulated ? 'simulated' : 'delivered') + ')', 'ok');
+        sendNotification('📧 Dispatch Email Sent', 'Surplus notice dispatched to ' + to, 'high');
+      } else {
+        terminalLog('EMAIL: Failed - ' + result.error, 'err');
+      }
+    } catch(e) {
+      terminalLog('EMAIL: Error - ' + e.message, 'err');
     }
-  } catch(e) {
-    terminalLog(`EMAIL: Error - ${e.message}`, 'err');
   }
 
   // Execute rescue confirmation
