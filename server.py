@@ -7,6 +7,17 @@ ML_TARGET = "http://localhost:5000/predict"
 DDG_TARGET = "https://api.duckduckgo.com/"
 GEMINI_BASE = "https://generativelanguage.googleapis.com"
 
+# Read env vars from Render and inject into client-side JS
+ENV_SCRIPT = ""
+keys = {
+    "CLAUDE_API_KEY": os.environ.get("CLAUDE_API_KEY", ""),
+    "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
+    "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID", ""),
+}
+if any(keys.values()):
+    ENV_SCRIPT = f'<script>window.__ENV = {json.dumps(keys)}</script>'
+    print(f"[SERVER] Injected env vars: {[k for k,v in keys.items() if v]}", flush=True)
+
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # Prevent browser caching of JS/HTML so updates are always picked up
@@ -16,6 +27,22 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        # Inject env vars into index.html so client-side JS picks up Render API keys
+        if self.path in ("/", "/index.html") and ENV_SCRIPT:
+            try:
+                with open("index.html", "rb") as f:
+                    content = f.read().decode("utf-8")
+                content = content.replace("</head>", ENV_SCRIPT + "</head>")
+                body = content.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                print(f"[SERVER] Inject error: {e}", flush=True)
+
         if self.path.startswith("/proxy/ddg?"):
             query = self.path.split("?", 1)[1]
             url = DDG_TARGET + "?" + query
