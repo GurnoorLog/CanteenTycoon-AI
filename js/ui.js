@@ -172,17 +172,34 @@ function updateSimWindow() {
 
 let widgetOverrides = null;
 
+function restoreWidgetState() {
+  const saved = localStorage.getItem('ct_widget_state');
+  if (saved) {
+    try { widgetOverrides = JSON.parse(saved); } catch(e) { widgetOverrides = null; }
+  }
+}
+
+function saveWidgetState() {
+  if (widgetOverrides) {
+    localStorage.setItem('ct_widget_state', JSON.stringify(widgetOverrides));
+  }
+}
+
 function applyWidgetOverrides(overrides) {
   widgetOverrides = overrides;
+  saveWidgetState();
   updateWidgets();
 }
 
 function resetWidgetOverrides() {
   widgetOverrides = null;
+  localStorage.removeItem('ct_widget_state');
   updateWidgets();
 }
 
 function updateWidgets() {
+  if (widgetOverrides === null) restoreWidgetState();
+
   const eff = document.getElementById('widget-efficiency');
   const effBar = document.getElementById('widget-efficiency-bar');
   const mood = document.getElementById('widget-mood');
@@ -245,7 +262,7 @@ function updateWidgets() {
   mood.textContent = moodLabel;
   moodDet.textContent = moodDetail;
 
-  co2.textContent = 'CO₂ Offset: ' + co2Val.toFixed(1) + 'kg';
+  co2.textContent = "Today's CO₂ Offset: " + co2Val.toFixed(1) + 'kg';
 }
 
 function createAgentControlWindow() {
@@ -690,17 +707,316 @@ function showPredictionPaper(pred) {
 }
 
 function approvePredictionPaper() {
+  if (!currentPrediction) return;
+  const p = currentPrediction;
+  const rescueKg = (p.predicted_waste_kg * 0.8).toFixed(1);
+  const meals = Math.round(parseFloat(rescueKg) * MEALS_PER_KG);
+  const shelterName = setupConfig?.shelterName || 'Partner Shelter';
+  const shelterEmail = setupConfig?.shelterEmail || '';
+  const canteenName = setupConfig?.canteenName || 'Cafeteria';
+  const managerName = setupConfig?.managerName || 'Manager';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const subject = `🍽️ Surplus Food Dispatch — ${canteenName} — ${dateStr}`;
+  const body = `Dear ${shelterName} Team,
+
+Greetings from ${canteenName}!
+
+We are pleased to inform you that we have surplus food available for dispatch today, ${dateStr}. Below are the details:
+
+━━━━━━━━━━━━━━━━━━━━━━━
+📦 DISPATCH NOTICE
+━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Source: ${canteenName}
+👨‍🍳 Manager: ${managerName}
+📅 Date: ${dateStr}
+🍽️ Estimated Surplus: ${rescueKg} kg
+👥 Estimated Meals: ~${meals} servings
+♻️ CO₂ Prevented: ~${(parseFloat(rescueKg) * CO2_PER_KG).toFixed(1)} kg
+
+━━━━━━━━━━━━━━━━━━━━━━━
+
+Our team is preparing the dispatch and we will coordinate the pickup/delivery shortly. Please confirm receipt at your earliest convenience.
+
+If you have any questions or need to adjust the pickup schedule, feel free to reach out.
+
+Thank you for partnering with us to reduce food waste and feed our community!
+
+Warm regards,
+${managerName}
+${canteenName}
+${setupConfig?.location || ''}`;
+
+  // Populate email modal
+  document.getElementById('email-approval-to').value = shelterEmail;
+  document.getElementById('email-approval-subject').value = subject;
+  document.getElementById('email-approval-body').value = body;
+  document.getElementById('email-approval-modal').classList.remove('hidden');
+}
+
+function closeEmailApproval() {
+  document.getElementById('email-approval-modal').classList.add('hidden');
+}
+
+async function confirmSendEmail() {
+  const rescueKg = currentPrediction ? (currentPrediction.predicted_waste_kg * 0.8).toFixed(2) : '0.00';
+  const to = document.getElementById('email-approval-to').value.trim();
+  const subject = document.getElementById('email-approval-subject').value.trim();
+  const body = document.getElementById('email-approval-body').value.trim();
+  if (!to) { terminalLog('EMAIL: No recipient email address', 'err'); return; }
+
+  closeEmailApproval();
+
+  // Close prediction paper
   const win = document.getElementById('win-prediction-paper');
   if(win) win.classList.add('hidden');
-  
-  const rescueKg = currentPrediction ? (currentPrediction.predicted_waste_kg * 0.8).toFixed(2) : '0.00';
-  sendNotification('🚨 Dispatcher Notification', `Surplus dispatch initiated: ${rescueKg}kg. Preparing manager approval sheet.`, 'high');
-  
-  // Show standard rescue window and populate Agent 3 draft
-  triggerAgent3();
+
+  // Send the email
+  try {
+    const res = await fetch('/proxy/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body })
+    });
+    const result = await res.json();
+    if (result.sent) {
+      terminalLog(`EMAIL: Dispatch notice sent to ${to} (${result.simulated ? 'simulated' : 'delivered'})`, 'ok');
+      sendNotification('📧 Dispatch Email Sent', `Surplus notice dispatched to ${to}`, 'high');
+    } else {
+      terminalLog(`EMAIL: Failed - ${result.error}`, 'err');
+    }
+  } catch(e) {
+    terminalLog(`EMAIL: Error - ${e.message}`, 'err');
+  }
+
+  // Execute rescue confirmation
+  if (currentPrediction) {
+    confirmRescueFromEmail();
+  }
+  sendNotification('🚨 Dispatcher Notification', `Surplus dispatch initiated: ${rescueKg}kg.`, 'high');
+}
+
+function confirmRescueFromEmail() {
+  if(!currentPrediction) return;
+  const r = parseFloat((currentPrediction.predicted_waste_kg * 0.8).toFixed(2));
+  const meals = Math.round(r * MEALS_PER_KG);
+  const co2 = parseFloat((r * CO2_PER_KG).toFixed(2));
+
+  rescuedToday += r;
+  mealsSaved += meals;
+  weekRescued += r;
+  weekMeals += meals;
+  localStorage.setItem('ct_wr', weekRescued.toFixed(2));
+  localStorage.setItem('ct_wm', weekMeals.toString());
+
+  const dayShort = new Date().toLocaleDateString('en-US',{weekday:'short'}).toLowerCase();
+
+  if (typeof recordObservation === 'function') {
+    recordObservation('rescue_confirmed', {
+      meal: setupConfig?.weeklyMenu?.[dayShort] || 'unknown',
+      served: parseInt(setupConfig?.avgStudents) || 0,
+      wasted: parseFloat(wasteToday.toFixed(2)),
+      rescued: r,
+      confidence: currentPrediction.confidence,
+      reasoning: currentPrediction.main_cause,
+      shelter: setupConfig?.shelterName || 'Food Bank',
+    });
+  }
+
+  if (typeof addRescueToWasteLogs === 'function') {
+    addRescueToWasteLogs({
+      food: currentPrediction.at_risk_meals?.join(', ') || 'Mixed',
+      kg: r, meals, co2,
+      shelter: setupConfig?.shelterName || 'City Food Bank',
+      manager: setupConfig?.managerName || 'Manager',
+      confidence: currentPrediction.confidence,
+      risk: currentPrediction.waste_risk,
+      reasoning: currentPrediction.main_cause,
+    });
+  }
+
+  terminalLog(`RESCUE_CONFIRMED: ${r}kg → ${setupConfig?.shelterName||'Food Bank'} ✓`, 'ok');
+  terminalLog(`IMPACT: ${co2}kg CO₂ prevented | ${meals} meals donated ✓`, 'ok');
+  updateAILogsWindow('RESCUE', `${r}kg confirmed | ${meals} meals | ${co2}kg CO₂ saved`, 'RESCUE_SUCCESS');
+  updateSimWindow();
+}
+
+let _reportQAData = null;
+
+function toggleReportQA() {
+  const section = document.getElementById('report-qa-section');
+  if (section) {
+    section.classList.toggle('hidden');
+    if (!section.classList.contains('hidden')) {
+      document.getElementById('report-qa-input')?.focus();
+    }
+  }
+}
+
+async function askReportQuestion() {
+  const input = document.getElementById('report-qa-input');
+  const thread = document.getElementById('report-qa-thread');
+  if (!input || !thread || !input.value.trim()) return;
+
+  const question = input.value.trim();
+  input.value = '';
+  input.disabled = true;
+
+  // Show user question
+  const qDiv = document.createElement('div');
+  qDiv.className = 'text-indigo-800 font-bold';
+  qDiv.textContent = '👤 ' + question;
+  thread.appendChild(qDiv);
+
+  // Build context
+  const p = currentPrediction;
+  const targetDate = _reportQAData?.targetDate || new Date().toLocaleDateString();
+  const context = `The user is asking about this forecast report:
+
+Date: ${targetDate}
+Menu: ${_reportQAData?.menu || 'N/A'}
+Weather: ${_reportQAData?.weather || 'N/A'}
+Calendar: ${_reportQAData?.calendar || 'N/A'}
+ML Prediction: ${p ? p.predicted_waste_kg + 'kg' : 'N/A'}
+Risk: ${p ? p.risk_pct + '% - ' + p.waste_risk : 'N/A'}
+CO2 at Risk: ${p ? p.co2_at_risk_kg + 'kg' : 'N/A'}
+
+User question: ${question}
+
+Answer concisely and informatively based on the above data. If you need to reference food science or behavioral patterns, do so.`;
+
+  try {
+    const answer = await callChatAI(
+      'You are a data analyst assistant. Answer the manager\'s question about the forecast report using the provided data. Be concise (2-4 sentences) and cite specific numbers.',
+      [{ role: 'user', content: context }]
+    );
+    const aDiv = document.createElement('div');
+    aDiv.className = 'text-slate-700 leading-relaxed';
+    aDiv.textContent = '🤖 ' + answer;
+    thread.appendChild(aDiv);
+    thread.scrollTop = thread.scrollHeight;
+  } catch(e) {
+    const aDiv = document.createElement('div');
+    aDiv.className = 'text-red-600';
+    aDiv.textContent = '⚠️ ' + e.message;
+    thread.appendChild(aDiv);
+  }
+
+  input.disabled = false;
+  input.focus();
+}
+
+function downloadForecastPaper() {
+  const p = currentPrediction;
+  if (!p) return;
+  const narrative = document.getElementById('pred-paper-explanation')?.textContent || '';
+  const tgtDate = _reportQAData?.targetDate || new Date().toLocaleDateString();
+  const menu = _reportQAData?.menu || 'N/A';
+  const weather = _reportQAData?.weather || 'N/A';
+  const calendar = _reportQAData?.calendar || 'N/A';
+  const canteen = setupConfig?.canteenName || 'CanteenTycoon';
+  const manager = setupConfig?.managerName || 'Manager';
+  const now = new Date();
+
+  const researchPaper = `# 🧪 CanteenTycoon — AI Forecast Research Report
+
+## Executive Summary
+**Prepared for:** ${canteen}  
+**Manager:** ${manager}  
+**Date:** ${now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}  
+**Target:** ${tgtDate}  
+**Menu:** ${menu}
+
+**Predicted Waste:** ${p.predicted_waste_kg} kg  
+**Risk Level:** ${p.waste_risk.toUpperCase()} (${p.risk_pct}%)  
+**CO₂ at Risk:** ${p.co2_at_risk_kg} kg  
+**Meals at Risk:** ~${Math.round(p.predicted_waste_kg * MEALS_PER_KG)} meals
+
+---
+
+## 1. Methodology
+
+This forecast uses a multi-signal AI approach combining four independent data streams synthesized by Claude 3.5 Sonnet with reference to a LightGBM model trained on 2,600+ real university canteen records across 4 food categories (Meat, Vegetables, Rice, Soup).
+
+### Data Sources
+- **LightGBM Baseline**: Statistical model predicting waste from historical patterns
+- **Weather Forecast**: Open-Meteo API data for target date conditions
+- **Academic Calendar**: Events affecting student attendance and appetite
+- **Menu Profile**: Category-level waste risk based on historical trends
+- **AI Synthesis**: Cross-referencing all signals with food science and behavioral economics
+
+---
+
+## 2. Factor Analysis
+
+### Weather Impact
+${weather}
+
+### Calendar Impact
+${calendar}
+
+### Menu Risk Analysis
+**Menu Item:** ${menu}  
+${p.main_cause || 'AI analysis based on historical consumption patterns.'}
+
+### ML Baseline Reference
+LightGBM model predicted baseline waste with category-level granularity.
+
+---
+
+## 3. AI Synthesis & Prediction
+
+**Forecast:** ${p.predicted_waste_kg} kg of ${menu} waste is predicted for ${tgtDate}.  
+**Risk Probability:** ${p.risk_pct}% — Classification: ${p.waste_risk.toUpperCase()}
+
+### Narrative Analysis
+${narrative}
+
+### Environmental Impact
+If this food waste is not prevented:
+- 🌍 **CO₂ Emissions:** ${p.co2_at_risk_kg} kg of CO₂ equivalent
+- 🍽️ **Meals Wasted:** ~${Math.round(p.predicted_waste_kg * MEALS_PER_KG)} meals
+- 💰 **Economic Loss:** Significant procurement inefficiency
+
+---
+
+## 4. Recommendations
+
+1. **Adjust Procurement**: Order ${Math.round(p.predicted_waste_kg * 0.3)} kg less ${menu} for ${tgtDate}
+2. **Monitor Weather**: ${weather.includes('heat') ? 'Consider lighter menu options in extreme heat' : 'Standard operations recommended'}
+3. **Portion Control**: Offer smaller serving sizes with optional seconds
+4. **Promote Lighter Options**: Encourage students toward lower-waste alternatives
+5. **Prepare Dispatch**: Coordinate with ${setupConfig?.shelterName || 'food shelter'} for surplus rescue
+
+---
+
+## 5. Data Sources
+
+| Source | Description |
+|--------|-------------|
+| LightGBM Model | 2,600+ records, 4 categories, trained on university canteen data |
+| Open-Meteo API | Free weather forecast API |
+| Academic Calendar | User-defined events + setup configuration |
+| Weekly Menu | Manager-configured meal plan |
+| Claude 3.5 Sonnet | AI synthesis & behavioral analysis |
+
+---
+
+*Report generated by CMD_CORE — CanteenTycoon AI Platform*  
+*${now.toISOString()}*`;
+
+  generatePDF(`Research_Report_${tgtDate.replace(/[\/,]/g,'_')}`, researchPaper);
 }
 
 window.approvePredictionPaper = approvePredictionPaper;
+window.closeEmailApproval = closeEmailApproval;
+window.confirmSendEmail = confirmSendEmail;
+window.toggleReportQA = toggleReportQA;
+window.askReportQuestion = askReportQuestion;
+window.downloadForecastPaper = downloadForecastPaper;
+window.confirmRescueFromEmail = confirmRescueFromEmail;
 
 // ─── CHAT HELPERS ────────────────────────────────────────────────────
 let chatProcessing = false;
@@ -1315,6 +1631,14 @@ function showPredictionPaperAnimated(pred, narrative, targetDate) {
   setId('pred-paper-co2-val', `${pred.co2_at_risk_kg} kg CO₂ at risk`);
   if (narrative) setId('pred-paper-explanation', narrative);
   else setId('pred-paper-explanation', pred.main_cause || 'AI synthesis complete.');
+
+  // Store context for Q&A and research paper
+  _reportQAData = {
+    targetDate: tgt.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
+    menu: targetMenu,
+    weather: `${cond || 'Unknown'}, ${hi ?? '--'}°C`,
+    calendar: `${cal.event} (${cal.type})`
+  };
 
   // Dispatch preview text
   const rescueKg = (pred.predicted_waste_kg * 0.8).toFixed(1);

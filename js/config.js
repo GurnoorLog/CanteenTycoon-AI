@@ -1,12 +1,31 @@
+// ── API Keys ──────────────────────────────────────────────────────────────
+// On Render: keys live in server environment variables — NEVER sent to browser.
+// For local dev: keys are read from localStorage (paste in Settings modal).
+// The server proxy prioritizes its own env var key, then falls back to client header.
 const cleanKey = (k) => {
   if (!k || k.includes('YOUR_') || k.includes('KEY_HERE')) return '';
   return k.trim();
 };
-
+// For local dev only — ignored by Render server when its env vars are set
 let CLAUDE_API_KEY = cleanKey(localStorage.getItem('ct_claude_key') || '');
 let GEMINI_API_KEY = cleanKey(localStorage.getItem('ct_gemini_key') || '');
+// Google Client ID — loaded from server proxy (not from HTML source) or localStorage for local dev
+let GOOGLE_CLIENT_ID = localStorage.getItem('ct_google_client_id') || '';
+// Fetch from server-side endpoint on Render (no keys in page source)
+(function __fetchGoogleId() {
+  fetch('/proxy/google-client-id')
+    .then(r => r.ok ? r.json() : { client_id: '' })
+    .then(data => {
+      if (data.client_id && !GOOGLE_CLIENT_ID) {
+        GOOGLE_CLIENT_ID = data.client_id;
+        localStorage.setItem('ct_google_client_id', data.client_id);
+        // Re-init Google Sign-In with the fetched ID
+        if (typeof initGoogleSignIn === 'function') initGoogleSignIn();
+      }
+    })
+    .catch(() => {});
+})();
 
-// Claude 3.5 Sonnet is the primary model for all AI tasks
 const CLAUDE_MODEL     = 'claude-sonnet-4-5';
 const GEMINI_IMG_MODEL = 'gemini-2.5-flash-image';
 const GEMINI_VIS_MODEL = 'gemini-1.5-flash';
@@ -16,20 +35,6 @@ const GEMINI_URL  = `/proxy/gemini/v1beta/models/${GEMINI_IMG_MODEL}:generateCon
 const GEMINI_VIS_URL = `/proxy/gemini/v1beta/models/${GEMINI_VIS_MODEL}:generateContent`;
 const OLLAMA_URL  = 'http://localhost:11434/api/generate';
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
-
-(function __applyEnv() {
-  const check = setInterval(() => {
-    const e = window.__ENV;
-    if (!e) return;
-    clearInterval(check);
-    if (!CLAUDE_API_KEY) CLAUDE_API_KEY = cleanKey(e.CLAUDE_API_KEY) || '';
-    if (!GEMINI_API_KEY) GEMINI_API_KEY = cleanKey(e.GEMINI_API_KEY) || '';
-    if (!localStorage.getItem('ct_google_client_id')) {
-      const g = cleanKey(e.GOOGLE_CLIENT_ID) || '';
-      if (g) localStorage.setItem('ct_google_client_id', g);
-    }
-  }, 100);
-})();
 
 const CANVAS_W        = 1100;
 const CANVAS_H        = 650;

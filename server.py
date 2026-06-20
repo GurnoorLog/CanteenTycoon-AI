@@ -1,5 +1,6 @@
 import http.server
 import urllib.request
+import urllib.parse
 import os, json, smtplib, logging
 from email.mime.text import MIMEText
 
@@ -8,41 +9,42 @@ ML_TARGET = "http://localhost:5000/predict"
 DDG_TARGET = "https://api.duckduckgo.com/"
 GEMINI_BASE = "https://generativelanguage.googleapis.com"
 
-# Read env vars from Render and inject into client-side JS
-ENV_SCRIPT = ""
-keys = {
-    "CLAUDE_API_KEY": os.environ.get("CLAUDE_API_KEY", ""),
-    "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY", ""),
-    "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID", ""),
-}
-if any(keys.values()):
-    ENV_SCRIPT = f'<script>window.__ENV = {json.dumps(keys)}</script>'
-    print(f"[SERVER] Injected env vars: {[k for k,v in keys.items() if v]}", flush=True)
+# Read env vars from Render — ALL keys stay server-side, NEVER sent to browser.
+# Claude/Gemini keys are injected server-side in proxy calls.
+# Google Client ID is served via a dedicated endpoint (not in HTML source).
+server_claude_key = os.environ.get("CLAUDE_API_KEY", "")
+server_gemini_key = os.environ.get("GEMINI_API_KEY", "")
+google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+if server_claude_key:
+    print("[SERVER] CLAUDE_API_KEY available server-side (not exposed to browser)", flush=True)
+if server_gemini_key:
+    print("[SERVER] GEMINI_API_KEY available server-side (not exposed to browser)", flush=True)
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        # Prevent browser caching of JS/HTML so updates are always picked up
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
         super().end_headers()
 
     def do_GET(self):
-        # Inject env vars into index.html so client-side JS picks up Render API keys
-        if self.path in ("/", "/index.html") and ENV_SCRIPT:
-            try:
-                with open("index.html", "rb") as f:
-                    content = f.read().decode("utf-8")
-                content = content.replace("</head>", ENV_SCRIPT + "</head>")
-                body = content.encode("utf-8")
+        # Serve Google Client ID via API (not in HTML source)
+        if self.path == "/proxy/google-client-id":
+            if google_client_id:
+                body = json.dumps({"client_id": google_client_id}).encode()
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
-                return
-            except Exception as e:
-                print(f"[SERVER] Inject error: {e}", flush=True)
+            else:
+                body = json.dumps({"client_id": ""}).encode()
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            return
 
         if self.path.startswith("/proxy/ddg?"):
             query = self.path.split("?", 1)[1]
@@ -122,9 +124,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/proxy/gemini"):
-            # Forward to Gemini API - strip /proxy/gemini prefix, keep ?key=... query
-            gemini_path = self.path[len("/proxy/gemini"):]  # e.g. /v1beta/models/...:generateContent?key=...
-            target_url = GEMINI_BASE + gemini_path
+            # Strip /proxy/gemini prefix to get the Gemini-relative path
+            gemini_path = self.path[len("/proxy/gemini"):]
+            # If server has a Gemini key, use it and strip any key from the client URL
+            if server_gemini_key:
+                parsed = urllib.parse.urlparse(gemini_path)
+                clean_path = parsed.path  # drop any ?key=... from client
+                target_url = f"{GEMINI_BASE}{clean_path}?key={server_gemini_key}"
+            else:
+                target_url = GEMINI_BASE + gemini_path  # local dev: client sends key
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
             print(f"[GEMINI_PROXY] -> {target_url[:80]}... ({length} bytes)", flush=True)
@@ -172,14 +180,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/proxy/claude":
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
-            api_key = self.headers.get("x-api-key", "")
-            print(f"[CLAUDE_PROXY] Request: {length} bytes | Key: {'present' if api_key else 'MISSING!'}", flush=True)
+            # Use server-side key first (from Render env var), fallback to client-provided key (local dev)
+            claude_key = server_claude_key or self.headers.get("x-api-key", "")
+            print(f"[CLAUDE_PROXY] Request: {length} bytes | Key: {'server' if server_claude_key else 'client' if claude_key else 'MISSING!'}", flush=True)
             req = urllib.request.Request(
                 "https://api.anthropic.com/v1/messages",
                 data=body,
                 headers={
                     "Content-Type": "application/json",
-                    "x-api-key": api_key,
+                    "x-api-key": claude_key,
                     "anthropic-version": "2023-06-01"
                 },
                 method="POST",

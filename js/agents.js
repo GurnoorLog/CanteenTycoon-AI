@@ -5,15 +5,12 @@
 
 async function callVisionAI(system, user, imageB64) {
   if(currentMode === 'local') return callOllama(system, user, imageB64, 'llama3.2-vision');
-  if(CLAUDE_API_KEY) return callClaude(system, user, imageB64);
-  return callGeminiVision(system, user, imageB64);
+  return callClaude(system, user, imageB64);
 }
 
 async function callTextAI(system, user, maxTokens=1000) {
   if (currentMode === 'local') return callOllama(system, user, null, 'phi3.5');
-  if (CLAUDE_API_KEY) return callClaude(system, user, null);
-  if (GEMINI_API_KEY) return callGeminiVision(system, user, null);
-  throw new Error('No API key configured. Add your Claude API key in Settings.');
+  return callClaude(system, user, null);
 }
 
 async function callOllama(system, user, imageB64=null, model='phi3.5') {
@@ -56,9 +53,6 @@ async function callClaude(system, user, imageB64=null) {
 // ── Claude Intent Router (JSON schema output) ────────────────────────────
 // Returns: { intent, confidence, params, chat_reply }
 async function callClaudeIntent(userMessage, contextData) {
-  if (!CLAUDE_API_KEY) {
-    return { intent: 'CHAT', confidence: 1.0, params: {}, chat_reply: null };
-  }
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate()+1);
@@ -128,12 +122,11 @@ Respond ONLY with this JSON (no other text). Do NOT write chat replies — class
 async function callClaudeWizard(history, currentConfig) {
   if (!CLAUDE_API_KEY) {
     return {
-      reply: "⚠️ Please add your Claude API key in Settings to enable the AI wizard. You can also use the classic form below.",
+      reply: "⚠️ No Claude API key found. On Render, configure CLAUDE_API_KEY in environment variables. For local dev, paste your key in Settings.",
       extractedConfig: currentConfig,
       isComplete: false
     };
   }
-
   const system = `You are SETUP_CORE, a friendly and professional AI setup wizard for CanteenTycoon — a school cafeteria food-waste reduction platform.
 Your job is to gather configuration details through natural conversation, then confirm everything.
 
@@ -218,7 +211,7 @@ async function callGeminiVision(system, user, imageB64=null) {
   }
   parts.push({text: `${system}\n\n${user}`});
   const model = (typeof GEMINI_VIS_MODEL !== 'undefined' ? GEMINI_VIS_MODEL : 'gemini-1.5-flash');
-  const url = `/proxy/gemini/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `/proxy/gemini/v1beta/models/${model}:generateContent` + (GEMINI_API_KEY ? `?key=${GEMINI_API_KEY}` : '');
   
   try {
     const res = await fetch(url, {
@@ -231,7 +224,7 @@ async function callGeminiVision(system, user, imageB64=null) {
       const errMsg = errBody.error?.message || '';
       if(res.status === 404 || errMsg.includes('not found') || errMsg.includes('no longer available')) {
         terminalLog(`GEMINI: Model ${model} failed (404). Falling back to gemini-1.5-flash...`, 'warn');
-        const fallbackUrl = `/proxy/gemini/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const fallbackUrl = `/proxy/gemini/v1beta/models/gemini-1.5-flash:generateContent` + (GEMINI_API_KEY ? `?key=${GEMINI_API_KEY}` : '');
         const fbRes = await fetch(fallbackUrl, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
@@ -260,42 +253,44 @@ async function callChatAI(system, history) {
     const lastMsg = history[history.length - 1]?.content || '';
     return callOllama(system, lastMsg, null, 'phi3.5');
   }
-  if (CLAUDE_API_KEY) {
-    const res = await fetch(CLAUDE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
+  for (const { name, url, buildBody } of [
+    {
+      name: 'Claude',
+      url: CLAUDE_URL,
+      buildBody: () => ({
         model: CLAUDE_MODEL,
         max_tokens: 2000,
         system,
         messages: history.map(h => ({ role: h.role, content: h.content }))
       })
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`Claude: ${e.error?.message || res.statusText}`);
+    },
+    {
+      name: 'Gemini',
+      url: `/proxy/gemini/v1beta/models/gemini-1.5-flash:generateContent` + (GEMINI_API_KEY ? `?key=${GEMINI_API_KEY}` : ''),
+      buildBody: () => {
+        const contents = history.map(h => ({
+          role: h.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: h.content }]
+        }));
+        return { contents, systemInstruction: { parts: [{ text: system }] } };
+      }
     }
-    return (await res.json()).content[0].text;
-  }
-  if (GEMINI_API_KEY) {
-    const contents = history.map(h => ({
-      role: h.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: h.content }]
-    }));
-    const url = `/proxy/gemini/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  ]) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (name === 'Claude') {
+      headers['x-api-key'] = CLAUDE_API_KEY;
+      headers['anthropic-version'] = '2023-06-01';
+    }
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: system }] } })
+      headers,
+      body: JSON.stringify(buildBody())
     });
-    if (!res.ok) throw new Error(`Gemini: ${res.status}`);
-    return (await res.json()).candidates[0].content.parts[0].text;
+    if (!res.ok) continue;
+    if (name === 'Claude') return (await res.json()).content[0].text;
+    if (name === 'Gemini') return (await res.json()).candidates[0].content.parts[0].text;
   }
-  throw new Error('No API key configured. Add your Claude API key in Settings (🔑).');
+  throw new Error('Could not reach any AI model. Check server API key configuration.');
 }
 
 // ── Procedural pixel-art cafeteria map (fallback when Gemini fails) ──────────
@@ -367,7 +362,7 @@ function generateProceduralMap() {
 }
 
 async function generateCafeteriaImage(userPhotoB64) {
-  if(!GEMINI_API_KEY) {
+  if (!GEMINI_API_KEY) {
     terminalLog('GEMINI: No API key — using procedural map fallback', 'warn');
     return generateProceduralMap();
   }
