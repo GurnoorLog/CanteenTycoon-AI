@@ -410,6 +410,32 @@
     .os-content::-webkit-scrollbar-thumb:hover {
         background: rgba(15, 23, 42, 0.4);
     }
+
+    /* Custom Google Sign-In button */
+    .gsi-material-button {
+        user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-user-select: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border: 2px solid #747775;
+        border-radius: 20px;
+        background: #fff;
+        color: #1f1f1f;
+        font-family: 'Google Sans',Roboto,Arial,sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.25px;
+        cursor: pointer;
+        transition: background .2s,box-shadow .2s;
+        white-space: nowrap;
+    }
+    .gsi-material-button:hover { background: #f7f8f8; border-color: #1f1f1f; }
+    .gsi-material-button .gsi-material-button-icon svg { display: block; width: 20px; height: 20px; }
 </style>
 <script>
     tailwind.config = {
@@ -571,7 +597,6 @@
                         <p class="font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Sign in with Google</p>
                         <div id="gsi-button-wrapper" class="flex justify-center"></div>
                         <p id="gsi-status" class="font-body-md text-sm text-on-surface-variant mt-xs hidden">Signed in as <span id="gsi-email"></span></p>
-                        <button id="gsi-grant-btn" onclick="requestGooglePermissions()" class="mt-xs w-full bg-indigo-500 text-white pixel-border px-3 py-1.5 text-[11px] font-bold uppercase hover:bg-indigo-600 hidden">🔑 Grant Gmail & Calendar Access</button>
                         <p id="gsi-error" class="font-body-md text-sm text-secondary mt-xs hidden"></p>
                         <input type="hidden" id="input-google-token"/>
                     </div>
@@ -1865,102 +1890,69 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         }
     }
 
-    // ── Google permissions store ──────────────────────────────────
+    // ── Google unified sign-in + permissions ──────────────────────
     window.__googleAccessToken = '';
-    const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
-    const GOOGLE_GMAIL_SCOPE = 'https://mail.google.com/';
+    const GOOGLE_SCOPES = 'openid profile email https://mail.google.com/ https://www.googleapis.com/auth/calendar';
 
-    async function requestGooglePermissions() {
-        const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-        if (!cid || !setupConfig?.googleUser || typeof google === 'undefined' || !google.accounts?.oauth2) return;
-        const btn = document.getElementById('gsi-grant-btn');
-        if (btn) { btn.textContent = '⏳ Requesting...'; btn.disabled = true; }
-        try {
-            const token = await new Promise((res, rej) => {
-                try {
-                    const tc = google.accounts.oauth2.initTokenClient({
-                        client_id: cid,
-                        scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
-                        prompt: 'consent',
-                        callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
-                    });
-                    tc.requestAccessToken();
-                } catch(e) { rej(e.message); }
-            });
-            window.__googleAccessToken = token;
-            if (btn) { btn.textContent = '✅ Gmail & Calendar Granted'; btn.classList.add('bg-green-600', 'hover:bg-green-700'); btn.classList.remove('bg-indigo-500', 'hover:bg-indigo-600'); btn.disabled = true; }
-            if (typeof terminalLog === 'function') terminalLog('[Google] Gmail + Calendar tokens ready', 'ok');
-            console.log('[Google] Gmail + Calendar permissions granted ✓');
-        } catch(e) {
-            console.warn('[Google] Permission request failed:', e);
-            if (btn) { btn.textContent = '🔑 Grant Gmail & Calendar Access (retry)'; btn.disabled = false; }
-        }
-    }
+    function onGoogleAuth(response) {
+        if (response.error) { console.warn('[Google] Auth error:', response.error); return; }
+        // Decode ID token for user identity
+        let payload;
+        try { payload = JSON.parse(atob(response.id_token.split('.')[1])); }
+        catch(e) { console.warn('[Google] ID token parse failed', e); return; }
+        // Store access token for Gmail/Calendar API calls
+        window.__googleAccessToken = response.access_token || '';
+        setupConfig.googleUser = payload;
+        localStorage.setItem('ct_google_user', JSON.stringify(payload));
+        document.getElementById('gsi-status').classList.remove('hidden');
+        document.getElementById('gsi-email').textContent = payload.email;
+        document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
+        document.getElementById('gsi-error').classList.add('hidden');
+        console.log('[Google] Signed in as', payload.email, '| Gmail+Calendar:', !!response.access_token);
 
-    // ============================================================
-    // GOOGLE SIGN-IN
-    // ============================================================
-
-    function handleGoogleCredential(response) {
-        try {
-            const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            setupConfig.googleUser = payload;
-            // Persist sign-in state
-            localStorage.setItem('ct_google_user', JSON.stringify(payload));
-
-            document.getElementById('gsi-status').classList.remove('hidden');
-            document.getElementById('gsi-email').textContent = payload.email;
-            document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
-            document.getElementById('gsi-error').classList.add('hidden');
-            console.log('[Google] Signed in as', payload.email);
-            
-            // Restore previous setup config for this user
-            const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
-            if (savedConfig) {
-                try {
-                    const parsed = JSON.parse(savedConfig);
-                    Object.assign(setupConfig, parsed);
-                    console.log('[Google] Restored config for', payload.email);
-                    // Pre-fill wizard fields if they exist
-                    const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-                    fill('input-canteen', parsed.canteenName);
-                    fill('input-location', parsed.location);
-                    fill('input-students', parsed.avgStudents);
-                    fill('input-staff', parsed.staffCount);
-                    fill('input-efficiency', parsed.efficiencyGoal);
-                    fill('input-open', parsed.openTime);
-                    fill('input-close', parsed.closeTime);
-                    fill('input-manager-name', parsed.managerName);
-                    fill('input-manager-contact', parsed.managerContact);
-                    fill('input-shelter', parsed.shelterName);
-                    if (parsed.weeklyMenu) {
-                        for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
-                            fill('input-' + d, v);
-                        }
+        // Restore previous setup config for this user
+        const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
+        if (savedConfig) {
+            try {
+                const parsed = JSON.parse(savedConfig);
+                Object.assign(setupConfig, parsed);
+                const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                fill('input-canteen', parsed.canteenName);
+                fill('input-location', parsed.location);
+                fill('input-students', parsed.avgStudents);
+                fill('input-staff', parsed.staffCount);
+                fill('input-efficiency', parsed.efficiencyGoal);
+                fill('input-open', parsed.openTime);
+                fill('input-close', parsed.closeTime);
+                fill('input-manager-name', parsed.managerName);
+                fill('input-manager-contact', parsed.managerContact);
+                fill('input-shelter', parsed.shelterName);
+                if (parsed.weeklyMenu) {
+                    for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
+                        fill('input-' + d, v);
                     }
-                    fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
-                    fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
-                } catch(e) { console.warn('[Google] Restore config failed', e); }
-            }
-
-            // Skip to desktop if setup is complete
-            if (setupConfig.wizardComplete) {
-                setTimeout(skipToDesktop, 500);
-            }
-
-            // Show grant button — user clicks it (real gesture) → popup not blocked
-            document.getElementById('gsi-grant-btn')?.classList.remove('hidden');
-
-            // Auto-fetch Calendar events silently (no popup if already granted)
-            setTimeout(() => {
-                if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
-            }, 1000);
-        } catch(e) {
-            console.warn('[Google] Token parse failed', e);
+                }
+                fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
+                fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
+            } catch(e) { console.warn('[Google] Restore config failed', e); }
         }
+        if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 500); }
+        // Auto-fetch Calendar events
+        setTimeout(() => { if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true); }, 1000);
+        if (typeof terminalLog === 'function') terminalLog('[Google] Signed in — Gmail+Calendar ready', 'ok');
     }
 
-    let _gsiInitialized = false;
+    function startGoogleAuth() {
+        const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+        if (!cid) { document.getElementById('gsi-error').textContent = 'Google Client ID not configured. Add it in API Settings.'; document.getElementById('gsi-error').classList.remove('hidden'); return; }
+        if (typeof google === 'undefined' || !google.accounts?.oauth2) { document.getElementById('gsi-error').textContent = 'Google library not loaded yet. Try again.'; document.getElementById('gsi-error').classList.remove('hidden'); return; }
+        google.accounts.oauth2.initTokenClient({
+            client_id: cid,
+            scope: GOOGLE_SCOPES,
+            prompt: 'consent',
+            callback: onGoogleAuth
+        }).requestAccessToken();
+    }
 
     function restoreGoogleSession() {
         const saved = localStorage.getItem('ct_google_user');
@@ -1972,7 +1964,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             document.getElementById('gsi-email').textContent = user.email;
             document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
             document.getElementById('gsi-error').classList.add('hidden');
-            // Restore saved setup config for this user
             const savedConfig = localStorage.getItem('ct_setup_config_' + user.email);
             if (savedConfig) {
                 try {
@@ -1994,37 +1985,19 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                             fill('input-' + d, v);
                         }
                     }
-                    console.log('[Google] Restored config for', user.email);
                 } catch(e) { console.warn('[Google] Config restore failed', e); }
             }
-            // Skip to desktop if setup is complete
-            if (setupConfig.wizardComplete) {
-                setTimeout(skipToDesktop, 500);
-            }
-            // Try silent token refresh (no popup if already granted)
-            setTimeout(async () => {
+            if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 500); }
+            // Try silent token refresh
+            setTimeout(() => {
                 const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-                if (cid && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
-                    try {
-                        const token = await new Promise((res, rej) => {
-                            google.accounts.oauth2.initTokenClient({
-                                client_id: cid,
-                                scope: GOOGLE_GMAIL_SCOPE + ' ' + GOOGLE_CALENDAR_SCOPE,
-                                prompt: '',
-                                callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
-                            }).requestAccessToken();
-                        });
-                        window.__googleAccessToken = token;
-                        const gb = document.getElementById('gsi-grant-btn');
-                        if (gb) { gb.textContent = '✅ Gmail & Calendar Granted'; gb.classList.add('bg-green-600'); gb.classList.remove('bg-indigo-500', 'hover:bg-indigo-600'); gb.disabled = true; }
-                    } catch(e) {
-                        // Silent refresh failed — show grant button for user click
-                        const gb = document.getElementById('gsi-grant-btn');
-                        if (gb) gb.classList.remove('hidden');
-                    }
+                if (cid && typeof google !== 'undefined' && google.accounts?.oauth2) {
+                    google.accounts.oauth2.initTokenClient({
+                        client_id: cid, scope: GOOGLE_SCOPES, prompt: '',
+                        callback: (r) => { if (r.access_token) window.__googleAccessToken = r.access_token; }
+                    }).requestAccessToken();
                 }
             }, 1500);
-            console.log('[Google] Restored session for', user.email);
         } catch(e) { console.warn('[Google] Session restore failed', e); }
     }
 
@@ -2032,60 +2005,21 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         const wrapper = document.getElementById('gsi-button-wrapper');
         const gsiContainer = document.getElementById('gsi-container');
         if(!wrapper || !gsiContainer) return;
-
-        // Try to get client ID from all sources
         let clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-
-        // Restore previous session if exists
         restoreGoogleSession();
-
         if(!clientId) {
             gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
-            _gsiInitialized = false;
-            // Retry once after 2s in case proxy fetch is still in flight
-            if (!window._gsiRetried) {
-                window._gsiRetried = true;
-                setTimeout(initGoogleSignIn, 2000);
-            }
+            if (!window._gsiRetried) { window._gsiRetried = true; setTimeout(initGoogleSignIn, 2000); }
             return;
         }
-
-        // If already signed in, just update UI and return
         if (setupConfig?.googleUser) {
-            if (!_gsiInitialized) {
-                _gsiInitialized = true;
-                // Fetch calendar events silently on session restore
-                setTimeout(() => {
-                    if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
-                }, 500);
-            }
+            setTimeout(() => { if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true); }, 500);
             return;
         }
-
-        // Wait for Google library to be available, then initialize
-        const doInit = () => {
-            if (typeof google === 'undefined' || !google.accounts) return false;
-            if (_gsiInitialized) google.accounts.id.cancel();
-            _gsiInitialized = true;
-            google.accounts.id.initialize({
-                client_id: clientId,
-                callback: handleGoogleCredential,
-                cancel_on_tap_outside: false
-            });
-            google.accounts.id.renderButton(wrapper, { theme:'outline', size:'large', type:'standard', shape:'rectangular', width:220 });
-            return true;
-        };
-
-        if (!doInit()) {
-            const check = setInterval(() => {
-                if (doInit()) clearInterval(check);
-            }, 200);
-            // Timeout after 10s to avoid infinite loop
-            setTimeout(() => clearInterval(check), 10000);
-        }
+        // Render custom sign-in button
+        wrapper.innerHTML = '<button onclick="startGoogleAuth()" class="gsi-material-button"><div class="gsi-material-button-state"></div><div class="gsi-material-button-content-wrapper"><div class="gsi-material-button-icon"><svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg></div><span class="gsi-material-button-text">Sign in with Google</span></div></button>';
     }
 
-    // Run on page load (will retry if client ID or library not ready)
     setTimeout(initGoogleSignIn, 300);
 
     // ============================================================
