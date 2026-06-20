@@ -1,8 +1,18 @@
 import http.server
 import urllib.request
 import urllib.parse
-import os, json, smtplib, logging
+import os, json, smtplib, logging, base64
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# Try to load Google API client (optional — falls back to SMTP or simulation)
+try:
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from google.auth.transport.requests import Request
+    GOOGLE_API_AVAILABLE = True
+except ImportError:
+    GOOGLE_API_AVAILABLE = False
 
 NIM_TARGET = "https://integrate.api.nvidia.com/v1/chat/completions"
 ML_TARGET = "http://localhost:5000/predict"
@@ -12,6 +22,7 @@ GEMINI_BASE = "https://generativelanguage.googleapis.com"
 # Read env vars from Render — ALL keys stay server-side, NEVER sent to browser.
 # Claude/Gemini keys are injected server-side in proxy calls.
 # Google Client ID is served via a dedicated endpoint (not in HTML source).
+# Gmail API: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, FROM_EMAIL
 server_claude_key = os.environ.get("CLAUDE_API_KEY", "")
 server_gemini_key = os.environ.get("GEMINI_API_KEY", "")
 google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
@@ -19,6 +30,12 @@ if server_claude_key:
     print("[SERVER] CLAUDE_API_KEY available server-side (not exposed to browser)", flush=True)
 if server_gemini_key:
     print("[SERVER] GEMINI_API_KEY available server-side (not exposed to browser)", flush=True)
+if os.environ.get("GOOGLE_REFRESH_TOKEN"):
+    print("[SERVER] Gmail API ready (GOOGLE_REFRESH_TOKEN set)", flush=True)
+elif os.environ.get("SMTP_HOST"):
+    print("[SERVER] SMTP email configured", flush=True)
+else:
+    print("[SERVER] No email provider configured — emails will be simulated", flush=True)
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -234,29 +251,68 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             to_addr = body.get("to", "")
             subject = body.get("subject", "CanteenTycoon AI Dispatch")
             text = body.get("body", "")
-            smtp_host = os.environ.get("SMTP_HOST", "")
-            smtp_port = int(os.environ.get("SMTP_PORT", 587))
-            smtp_user = os.environ.get("SMTP_USER", "")
-            smtp_pass = os.environ.get("SMTP_PASS", "")
             from_addr = os.environ.get("FROM_EMAIL", "noreply@canteentycoon.com")
-            if smtp_host and smtp_user:
+            resp = {"sent": False, "to": to_addr}
+
+            # Try Gmail API first (OAuth2 with refresh token)
+            gmail_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+            gmail_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+            gmail_refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN", "")
+            if GOOGLE_API_AVAILABLE and gmail_client_id and gmail_client_secret and gmail_refresh_token:
                 try:
-                    msg = MIMEText(text, "plain", "utf-8")
-                    msg["Subject"] = subject
-                    msg["From"] = from_addr
-                    msg["To"] = to_addr
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
-                        s.starttls()
-                        s.login(smtp_user, smtp_pass)
-                        s.send_message(msg)
-                    resp = {"sent": True, "to": to_addr}
-                    print(f"[EMAIL] Sent to {to_addr}: {subject}", flush=True)
+                    creds = Credentials(
+                        None,
+                        refresh_token=gmail_refresh_token,
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=gmail_client_id,
+                        client_secret=gmail_client_secret,
+                    )
+                    # Auto-refresh if expired
+                    creds.refresh(Request())
+                    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+                    # Build RFC 2822 email
+                    mime = MIMEMultipart("alternative")
+                    mime["Subject"] = subject
+                    mime["From"] = from_addr
+                    mime["To"] = to_addr
+                    mime.attach(MIMEText(text, "plain", "utf-8"))
+                    raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
+
+                    sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+                    resp = {"sent": True, "to": to_addr, "gmail_id": sent.get("id")}
+                    print(f"[EMAIL] Sent via Gmail API to {to_addr}: {subject} (ID: {sent.get('id')})", flush=True)
                 except Exception as e:
-                    resp = {"sent": False, "error": str(e)}
-                    print(f"[EMAIL] Failed to {to_addr}: {e}", flush=True)
-            else:
-                resp = {"sent": True, "simulated": True, "to": to_addr, "note": "No SMTP configured, email simulated"}
-                print(f"[EMAIL] Simulated send to {to_addr}: {subject}", flush=True)
+                    err_msg = str(e)
+                    print(f"[EMAIL] Gmail API failed for {to_addr}: {err_msg}", flush=True)
+                    # Fall through to SMTP below
+                    resp = {"sent": False, "error": f"Gmail API: {err_msg}"}
+
+            # SMTP fallback (if Gmail API wasn't used or failed)
+            if not resp.get("sent"):
+                smtp_host = os.environ.get("SMTP_HOST", "")
+                smtp_port = int(os.environ.get("SMTP_PORT", 587))
+                smtp_user = os.environ.get("SMTP_USER", "")
+                smtp_pass = os.environ.get("SMTP_PASS", "")
+                if smtp_host and smtp_user:
+                    try:
+                        msg = MIMEText(text, "plain", "utf-8")
+                        msg["Subject"] = subject
+                        msg["From"] = from_addr
+                        msg["To"] = to_addr
+                        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+                            s.starttls()
+                            s.login(smtp_user, smtp_pass)
+                            s.send_message(msg)
+                        resp = {"sent": True, "to": to_addr}
+                        print(f"[EMAIL] Sent via SMTP to {to_addr}: {subject}", flush=True)
+                    except Exception as e:
+                        resp = {"sent": False, "error": str(e)}
+                        print(f"[EMAIL] SMTP failed to {to_addr}: {e}", flush=True)
+                else:
+                    resp = {"sent": True, "simulated": True, "to": to_addr, "note": "No email provider configured, email simulated"}
+                    print(f"[EMAIL] Simulated send to {to_addr}: {subject}", flush=True)
+
             body_resp = json.dumps(resp).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
