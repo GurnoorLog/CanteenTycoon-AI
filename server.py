@@ -11,8 +11,8 @@ try:
     from googleapiclient.discovery import build
     from google.auth.transport.requests import Request
     GOOGLE_API_AVAILABLE = True
-    except ImportError:
-        GOOGLE_API_AVAILABLE = False
+except ImportError:
+    GOOGLE_API_AVAILABLE = False
 
 # Build a Google Calendar API service using the same OAuth2 refresh token
 def _calendar_service():
