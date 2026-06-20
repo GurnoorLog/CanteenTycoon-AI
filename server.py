@@ -11,8 +11,21 @@ try:
     from googleapiclient.discovery import build
     from google.auth.transport.requests import Request
     GOOGLE_API_AVAILABLE = True
-except ImportError:
-    GOOGLE_API_AVAILABLE = False
+    except ImportError:
+        GOOGLE_API_AVAILABLE = False
+
+# Build a Google Calendar API service using the same OAuth2 refresh token
+def _calendar_service():
+    cid = os.environ.get("GOOGLE_CLIENT_ID", "")
+    cs = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    rt = os.environ.get("GOOGLE_REFRESH_TOKEN", "")
+    if not GOOGLE_API_AVAILABLE or not cid or not cs or not rt:
+        return None
+    creds = Credentials(None, refresh_token=rt,
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=cid, client_secret=cs)
+    creds.refresh(Request())
+    return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 NIM_TARGET = "https://integrate.api.nvidia.com/v1/chat/completions"
 ML_TARGET = "http://localhost:5000/predict"
@@ -318,6 +331,72 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Content-Length", str(len(body_resp)))
+            self.end_headers()
+            self.wfile.write(body_resp)
+            return
+
+        if self.path.startswith("/proxy/calendar"):
+            length = int(self.headers.get("Content-Length", 0))
+            req_body = json.loads(self.rfile.read(length))
+            action = req_body.get("action", "")
+            cal = _calendar_service()
+            resp = {"ok": False, "error": "Calendar API not configured or Google API not available"}
+
+            if cal:
+                try:
+                    if action == "create":
+                        event = {
+                            "summary": req_body.get("title", "CanteenTycoon Event"),
+                            "start": {"date": req_body.get("date")},
+                            "end": {"date": req_body.get("date")},
+                        }
+                        created = cal.events().insert(calendarId="primary", body=event).execute()
+                        resp = {"ok": True, "id": created.get("id"), "htmlLink": created.get("htmlLink")}
+                        print(f"[CALENDAR] Created event: {req_body.get('title')} on {req_body.get('date')}", flush=True)
+
+                    elif action == "list":
+                        now = __import__("datetime").datetime.utcnow()
+                        time_min = now.replace(day=1)
+                        if time_min.month == 1:
+                            time_min = time_min.replace(year=time_min.year - 1, month=12)
+                        else:
+                            time_min = time_min.replace(month=time_min.month - 1)
+                        time_max = now.replace(day=1)
+                        if time_max.month == 12:
+                            time_max = time_max.replace(year=time_max.year + 1, month=1)
+                        else:
+                            time_max = time_max.replace(month=time_max.month + 3)
+                        events = cal.events().list(
+                            calendarId="primary", singleEvents=True,
+                            orderBy="startTime",
+                            timeMin=time_min.isoformat() + "Z",
+                            timeMax=time_max.isoformat() + "Z",
+                            maxResults=100
+                        ).execute()
+                        items = []
+                        for e in events.get("items", []):
+                            start = (e.get("start") or {}).get("date") or (e.get("start") or {}).get("dateTime", "")[:10]
+                            if start and e.get("summary"):
+                                items.append({"date": start, "title": e["summary"].strip(), "id": e.get("id")})
+                        resp = {"ok": True, "items": items}
+                        print(f"[CALENDAR] Listed {len(items)} events", flush=True)
+
+                    elif action == "delete":
+                        event_id = req_body.get("id", "")
+                        if event_id:
+                            cal.events().delete(calendarId="primary", eventId=event_id).execute()
+                            resp = {"ok": True}
+                            print(f"[CALENDAR] Deleted event {event_id}", flush=True)
+
+                except Exception as e:
+                    resp = {"ok": False, "error": str(e)}
+                    print(f"[CALENDAR] Error: {e}", flush=True)
+
+            body_resp = json.dumps(resp).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body_resp)))
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body_resp)
             return
