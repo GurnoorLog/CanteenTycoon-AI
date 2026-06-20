@@ -9,21 +9,24 @@ const cleanKey = (k) => {
 // For local dev only — ignored by Render server when its env vars are set
 let CLAUDE_API_KEY = cleanKey(localStorage.getItem('ct_claude_key') || '');
 let GEMINI_API_KEY = cleanKey(localStorage.getItem('ct_gemini_key') || '');
-// Google Client ID — loaded from server proxy (not from HTML source) or localStorage for local dev
+// Google Client ID — loaded from server proxy (not from HTML source)
+// Falls back to localStorage (user-pasted in Settings for local dev)
 let GOOGLE_CLIENT_ID = localStorage.getItem('ct_google_client_id') || '';
+window.GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID;
 // Fetch from server-side endpoint on Render (no keys in page source)
 (function __fetchGoogleId() {
   fetch('/proxy/google-client-id')
     .then(r => r.ok ? r.json() : { client_id: '' })
     .then(data => {
-      if (data.client_id && !GOOGLE_CLIENT_ID) {
+      if (data.client_id && !localStorage.getItem('ct_google_client_id')) {
         GOOGLE_CLIENT_ID = data.client_id;
+        window.GOOGLE_CLIENT_ID = data.client_id;
         localStorage.setItem('ct_google_client_id', data.client_id);
         // Re-init Google Sign-In with the fetched ID
         if (typeof initGoogleSignIn === 'function') initGoogleSignIn();
       }
     })
-    .catch(() => {});
+    .catch(() => { /* proxy not available (local dev without server) */ });
 })();
 
 const CLAUDE_MODEL     = 'claude-sonnet-4-5';

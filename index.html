@@ -1861,8 +1861,10 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         // Update global variables
         GEMINI_API_KEY = geminiVal;
         CLAUDE_API_KEY = claudeVal;
+        GOOGLE_CLIENT_ID = googleVal;
         window.GEMINI_API_KEY = geminiVal;
         window.CLAUDE_API_KEY = claudeVal;
+        window.GOOGLE_CLIENT_ID = googleVal;
 
         closeApiSettings();
         initGoogleSignIn();
@@ -1986,7 +1988,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         const wrapper = document.getElementById('gsi-button-wrapper');
         const gsiContainer = document.getElementById('gsi-container');
         if(!wrapper || !gsiContainer) return;
-        const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+
+        // Try to get client ID from all sources
+        let clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
 
         // Restore previous session if exists
         restoreGoogleSession();
@@ -1994,43 +1998,51 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         if(!clientId) {
             gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
             _gsiInitialized = false;
+            // Retry once after 2s in case proxy fetch is still in flight
+            if (!window._gsiRetried) {
+                window._gsiRetried = true;
+                setTimeout(initGoogleSignIn, 2000);
+            }
             return;
         }
 
-        // If already signed in and button hidden, don't re-render button
+        // If already signed in, just update UI and return
         if (setupConfig?.googleUser) {
-            if (_gsiInitialized) return;
-            _gsiInitialized = true;
+            if (!_gsiInitialized) {
+                _gsiInitialized = true;
+                // Fetch calendar events silently on session restore
+                setTimeout(() => {
+                    if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
+                }, 500);
+            }
             return;
         }
 
-        if(_gsiInitialized && typeof google !== 'undefined' && google.accounts) {
-            google.accounts.id.cancel();
+        // Wait for Google library to be available, then initialize
+        const doInit = () => {
+            if (typeof google === 'undefined' || !google.accounts) return false;
+            if (_gsiInitialized) google.accounts.id.cancel();
+            _gsiInitialized = true;
             google.accounts.id.initialize({
                 client_id: clientId,
                 callback: handleGoogleCredential,
                 cancel_on_tap_outside: false
             });
             google.accounts.id.renderButton(wrapper, { theme:'outline', size:'large', type:'standard', shape:'rectangular', width:220 });
-            return;
-        }
+            return true;
+        };
 
-        const check = setInterval(() => {
-            if(typeof google !== 'undefined' && google.accounts) {
-                clearInterval(check);
-                _gsiInitialized = true;
-                google.accounts.id.initialize({
-                    client_id: clientId,
-                    callback: handleGoogleCredential,
-                    cancel_on_tap_outside: false
-                });
-                google.accounts.id.renderButton(wrapper, { theme:'outline', size:'large', type:'standard', shape:'rectangular', width:220 });
-            }
-        }, 200);
+        if (!doInit()) {
+            const check = setInterval(() => {
+                if (doInit()) clearInterval(check);
+            }, 200);
+            // Timeout after 10s to avoid infinite loop
+            setTimeout(() => clearInterval(check), 10000);
+        }
     }
 
-    // Run on page load
-    setTimeout(initGoogleSignIn, 500);
+    // Run on page load (will retry if client ID or library not ready)
+    setTimeout(initGoogleSignIn, 300);
 
     // ============================================================
     // FOLDER 3 JS — Welcome Gate (kept for reference)
@@ -2483,35 +2495,88 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     function syncToGoogleCalendar(date, title) {
-        if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) return;
+        if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync: Not signed in or SDK not loaded', 'warn');
+            return;
+        }
+        // Check for cached token first (from fetchFromGoogleCalendar)
+        const cached = (() => { try { return JSON.parse(localStorage.getItem('ct_google_token')); } catch(e) { return null; } })();
+        if (cached && cached.access_token && Date.now() < cached.expiry) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Using cached token for event sync', 'ok');
+            createCalendarEvent(cached.access_token, date, title);
+            return;
+        }
         try {
+            const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+            if (!clientId) {
+                if (typeof terminalLog === 'function') terminalLog('[Google] No client ID for Calendar sync', 'err');
+                return;
+            }
             const tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '',
-                scope: 'https://www.googleapis.com/auth/calendar.events',
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly',
                 callback: (resp) => {
+                    if (resp.error) {
+                        if (typeof terminalLog === 'function') terminalLog('[Google] Calendar token error: ' + resp.error, 'err');
+                        return;
+                    }
                     if (resp.access_token) {
-                        fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': 'Bearer ' + resp.access_token,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                summary: title,
-                                start: { date: date },
-                                end: { date: date }
-                            })
-                        }).catch(() => { });
+                        // Cache token for reuse
+                        localStorage.setItem('ct_google_token', JSON.stringify({
+                            access_token: resp.access_token,
+                            expiry: Date.now() + (resp.expires_in || 3600) * 1000 - 60000
+                        }));
+                        if (typeof terminalLog === 'function') terminalLog('[Google] Token cached, creating event...', 'ok');
+                        createCalendarEvent(resp.access_token, date, title);
                     }
                 }
             });
             tokenClient.requestAccessToken();
-        } catch (_) { }
+        } catch (e) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Sync error: ' + e.message, 'err');
+        }
+    }
+
+    async function createCalendarEvent(accessToken, date, title) {
+        try {
+            const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    summary: title,
+                    start: { date: date },
+                    end: { date: date }
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (typeof terminalLog === 'function') terminalLog('[Google] Event created: ' + (data.htmlLink || title), 'ok');
+            } else if (res.status === 403) {
+                // Calendar API not enabled - try to help the user
+                const errBody = await res.json().catch(() => ({}));
+                const msg = errBody.error?.message || 'Calendar API returned 403 — enable it in Google Cloud Console';
+                if (typeof terminalLog === 'function') terminalLog('[Google] ' + msg, 'err');
+                // Clear cached token so it re-prompts next time
+                localStorage.removeItem('ct_google_token');
+                // Show a one-time notification to the user
+                if (typeof sendNotification === 'function') {
+                    sendNotification('⚠️ Calendar Sync Failed', 'Google Calendar API returned 403. Make sure it is enabled in Google Cloud Console → APIs & Services → Library → Google Calendar API → Enable.', 'high');
+                }
+            } else {
+                const errBody = await res.json().catch(() => ({}));
+                if (typeof terminalLog === 'function') terminalLog('[Google] Event create error: ' + (errBody.error?.message || res.status), 'err');
+            }
+        } catch(e) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Event create fetch error: ' + e.message, 'err');
+        }
     }
 
     function fetchFromGoogleCalendar(silent) {
         if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) {
-            if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync calendar: Not signed in or SDK not loaded', 'warn');
+            if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync: Not signed in or SDK not loaded', 'warn');
             return;
         }
         // Check if we have a cached token that's still valid
@@ -2521,24 +2586,32 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             return fetchCalendarEvents(cached.access_token);
         }
         try {
-        const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-            if (!clientId) return;
-            if (typeof terminalLog === 'function') terminalLog('[Google] Requesting Calendar access...', 'run');
+            const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+            if (!clientId) {
+                if (typeof terminalLog === 'function') terminalLog('[Google] No client ID for Calendar fetch', 'warn');
+                return;
+            }
+            if (typeof terminalLog === 'function') terminalLog('[Google] ' + (silent ? 'Silent token request...' : 'Requesting Calendar access...'), 'run');
             const tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
-                scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events',
+                scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly',
                 prompt: silent ? '' : 'consent',
                 callback: async (resp) => {
                     if (resp.error) {
-                        if (typeof terminalLog === 'function') terminalLog('[Google] ' + (silent ? 'Silent ' : '') + 'token error: ' + resp.error, 'warn');
-                        if (silent) setTimeout(() => fetchFromGoogleCalendar(false), 500);
+                        if (resp.error === 'immediate_failed' || resp.error === 'interaction_required') {
+                            if (typeof terminalLog === 'function') terminalLog('[Google] Silent token failed, retrying with consent...', 'run');
+                            if (silent) setTimeout(() => fetchFromGoogleCalendar(false), 500);
+                            return;
+                        }
+                        if (typeof terminalLog === 'function') terminalLog('[Google] Token error: ' + resp.error + (resp.error_subtype ? ' (' + resp.error_subtype + ')' : ''), 'warn');
+                        if (silent) setTimeout(() => fetchFromGoogleCalendar(false), 1000);
                         return;
                     }
                     if (!resp.access_token) return;
-                    // Cache token for reuse (expires_in is seconds from now)
+                    // Cache token for reuse
                     localStorage.setItem('ct_google_token', JSON.stringify({
                         access_token: resp.access_token,
-                        expiry: Date.now() + (resp.expires_in || 3600) * 1000 - 60000 // 1 min buffer
+                        expiry: Date.now() + (resp.expires_in || 3600) * 1000 - 60000
                     }));
                     if (typeof terminalLog === 'function') terminalLog('[Google] Token cached, fetching events...', 'ok');
                     await fetchCalendarEvents(resp.access_token);
@@ -2557,7 +2630,17 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             const timeMax = new Date(now.getFullYear(), now.getMonth() + 3, 1).toISOString();
             const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}&maxResults=100`;
             const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-            if (res.status === 403) throw new Error(`Google Calendar API returned 403 — enable "Google Calendar API" at https://console.cloud.google.com/apis/library/calendar.googleapis.com`);
+            if (res.status === 403) {
+                // Clear cached token so it re-auths next time
+                localStorage.removeItem('ct_google_token');
+                const errBody = await res.json().catch(() => ({}));
+                const msg = errBody.error?.message || 'Calendar API returned 403';
+                if (typeof terminalLog === 'function') terminalLog('[Google] 403: ' + msg, 'err');
+                if (typeof sendNotification === 'function') {
+                    sendNotification('⚠️ Google Calendar API Error', 'Enable "Google Calendar API" at https://console.cloud.google.com/apis/library/calendar.googleapis.com', 'high');
+                }
+                return;
+            }
             if (!res.ok) throw new Error(`Google Calendar API returned ${res.status}`);
             const data = await res.json();
             let addedCount = 0;
@@ -2741,11 +2824,11 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         });
     });
 </script>
-<script src="js/config.js?v=20260620x"></script>
-<script src="js/data.js?v=20260620x"></script>
-<script src="js/agents.js?v=20260620x"></script>
-<script src="js/npc.js?v=20260620x"></script>
-<script src="js/simulation.js?v=20260620x"></script>
-<script src="js/ui.js?v=20260620x"></script>
+<script src="js/config.js?v=20260620y"></script>
+<script src="js/data.js?v=20260620y"></script>
+<script src="js/agents.js?v=20260620y"></script>
+<script src="js/npc.js?v=20260620y"></script>
+<script src="js/simulation.js?v=20260620y"></script>
+<script src="js/ui.js?v=20260620y"></script>
 </body>
 </html>
