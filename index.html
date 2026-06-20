@@ -755,6 +755,47 @@ __loadEnv();
     </div>
 </div>
 
+<!-- Canteen Settings Modal -->
+<div class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center hidden" id="canteen-settings-modal">
+    <div class="bg-white pixel-border tactile-shadow p-lg max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-md">
+            <h3 class="font-headline-md text-headline-md text-deep-slate-navy uppercase">Canteen Settings</h3>
+            <button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors font-bold text-xl" onclick="closeCanteenSettings()">close</button>
+        </div>
+        <div class="space-y-sm">
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Canteen Name</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="text" id="settings-canteen"/></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Location</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="text" id="settings-location"/></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Students/day</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="number" id="settings-students"/></div>
+                <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Staff</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="number" id="settings-staff"/></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Open</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="time" id="settings-open"/></div>
+                <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Close</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="time" id="settings-close"/></div>
+            </div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Efficiency Goal</label>
+                <select class="w-full pixel-border p-sm font-body-md text-xs" id="settings-efficiency">
+                    <option>80% - Balanced Growth</option><option>90% - High Performance</option><option>99% - Peak Simulation</option>
+                </select>
+            </div>
+            <div><hr class="border-deep-slate-navy/20 my-2"></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Manager Name</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="text" id="settings-manager"/></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Manager Contact</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="text" id="settings-contact"/></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Shelter Name</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="text" id="settings-shelter"/></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Shelter Email</label><input class="w-full pixel-border p-sm font-body-md text-xs" type="email" id="settings-shelter-email"/></div>
+            <div><hr class="border-deep-slate-navy/20 my-2"></div>
+            <div><label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">Cafeteria Photo</label>
+                <input class="w-full pixel-border p-sm font-body-md text-xs" type="file" accept="image/*" id="settings-photo"/>
+                <span id="settings-photo-name" class="text-[10px] text-slate-400 mt-1 block"></span>
+            </div>
+        </div>
+        <div class="mt-lg flex gap-2">
+            <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase" onclick="saveCanteenSettings()">Save Changes</button>
+            <button class="bg-secondary text-white pixel-border px-4 py-sm font-label-lg uppercase" onclick="closeCanteenSettings()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- ============================================================ -->
 <!-- SECTION 3: DESKTOP OS (from echo — enhanced) -->
 <!-- ============================================================ -->
@@ -856,49 +897,44 @@ __loadEnv();
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Monday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-mon-type">
-                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
-                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                        <option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-mon-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-mon-name" placeholder="Dish name..."/>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Tuesday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-tue-type">
-                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
-                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                        <option value="Meat">Meat</option><option value="Rice">Rice</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-tue-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-tue-name" placeholder="Dish name..."/>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Wednesday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-wed-type">
-                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
-                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                        <option value="Vegetables">Vegetables</option><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Soup">Soup</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-wed-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-wed-name" placeholder="Dish name..."/>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Thursday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-thu-type">
-                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
-                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                        <option value="Soup">Soup</option><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-thu-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-thu-name" placeholder="Dish name..."/>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Friday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-fri-type">
-                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
-                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                        <option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-fri-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-fri-name" placeholder="Dish name..."/>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-center">
                     <span class="font-mono text-xs font-bold uppercase">Saturday:</span>
                     <select class="pixel-border p-1 text-xs" id="menu-edit-sat-type">
-                        <option value="closed">Closed</option><option value="special">Special</option>
+                        <option value="closed">Closed</option>
                     </select>
-                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-sat-name" placeholder="Custom dish name..."/>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-sat-name" placeholder="Dish name..."/>
                 </div>
             </div>
             <button onclick="saveStructuredMenu()" class="w-full bg-primary text-white pixel-border py-1.5 font-label-lg uppercase text-xs hover:bg-primary-container transition-colors mt-2">Save Menu Configuration</button>
@@ -1286,6 +1322,13 @@ __loadEnv();
                 <i data-lucide="file-spreadsheet" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
             </div>
             <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">MENU_CFG</span>
+        </div>
+        <div class="folder-item" onclick="openCanteenSettings()">
+            <div class="relative">
+                <svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                <i data-lucide="settings" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
+            </div>
+            <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">SETTINGS</span>
         </div>
     </div>
     <!-- TASKBAR / DOCK -->
@@ -2479,13 +2522,64 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
     window.fetchFromGoogleCalendar = fetchFromGoogleCalendar;
 
+    // ── Canteen Settings Modal ─────────────────────────────────────
+    window.openCanteenSettings = function() {
+        const fill = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+        fill('settings-canteen', setupConfig?.canteenName);
+        fill('settings-location', setupConfig?.location);
+        fill('settings-students', setupConfig?.avgStudents);
+        fill('settings-staff', setupConfig?.staffCount);
+        fill('settings-open', setupConfig?.openTime || '07:00');
+        fill('settings-close', setupConfig?.closeTime || '15:00');
+        fill('settings-efficiency', setupConfig?.efficiencyGoal || '80% - Balanced Growth');
+        fill('settings-manager', setupConfig?.managerName);
+        fill('settings-contact', setupConfig?.managerContact);
+        fill('settings-shelter', setupConfig?.shelterName);
+        fill('settings-shelter-email', setupConfig?.shelterEmail);
+        document.getElementById('settings-photo-name').textContent = setupConfig?.cafeteriaPhoto?.name || '';
+        document.getElementById('canteen-settings-modal').classList.remove('hidden');
+    };
+    window.closeCanteenSettings = function() {
+        document.getElementById('canteen-settings-modal').classList.add('hidden');
+    };
+    window.saveCanteenSettings = function() {
+        const g = (id) => document.getElementById(id);
+        setupConfig.canteenName = g('settings-canteen').value.trim();
+        setupConfig.location = g('settings-location').value.trim();
+        setupConfig.avgStudents = parseInt(g('settings-students').value) || 0;
+        setupConfig.staffCount = parseInt(g('settings-staff').value) || 0;
+        setupConfig.openTime = g('settings-open').value || '07:00';
+        setupConfig.closeTime = g('settings-close').value || '15:00';
+        setupConfig.efficiencyGoal = g('settings-efficiency').value;
+        setupConfig.managerName = g('settings-manager').value.trim();
+        setupConfig.managerContact = g('settings-contact').value.trim();
+        setupConfig.shelterName = g('settings-shelter').value.trim();
+        setupConfig.shelterEmail = g('settings-shelter-email').value.trim();
+        const photoFile = g('settings-photo').files?.[0];
+        if (photoFile) setupConfig.cafeteriaPhoto = photoFile;
+        const email = setupConfig?.googleUser?.email;
+        if (email) {
+            const saveable = { ...setupConfig, cafeteriaPhoto: null, googleUser: null };
+            localStorage.setItem('ct_setup_config_' + email, JSON.stringify(saveable));
+        }
+        closeCanteenSettings();
+        if (typeof terminalLog === 'function') terminalLog('SETTINGS: Canteen config updated ✓', 'ok');
+        const toast = document.getElementById('global-toast');
+        if (toast) {
+            document.getElementById('toast-title').textContent = '⚙️ Settings Saved';
+            document.getElementById('toast-message').textContent = 'Canteen configuration updated.';
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+    };
+
     function openMenuEditor() {
         toggleWindow('win-menu-editor');
         const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
         days.forEach(d => {
-            const item = setupConfig.weeklyMenu?.[d] || 'pasta';
+            const item = setupConfig.weeklyMenu?.[d] || 'Rice';
             const parts = item.split(':');
-            const type = parts[0] || 'pasta';
+            const type = parts[0] || 'Rice';
             const name = parts[1] || '';
             
             const typeEl = document.getElementById(`menu-edit-${d}-type`);
@@ -2502,9 +2596,14 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         days.forEach(d => {
             const type = document.getElementById(`menu-edit-${d}-type`).value;
             const name = document.getElementById(`menu-edit-${d}-name`).value.trim();
-            setupConfig.weeklyMenu[d] = name ? `${type}:${name}` : type;
+            setupConfig.weeklyMenu[d] = name || type;
         });
         localStorage.setItem('ct_setup_config', JSON.stringify(setupConfig));
+        const email = setupConfig?.googleUser?.email;
+        if (email) {
+            const saveable = { ...setupConfig, cafeteriaPhoto: null, googleUser: null };
+            localStorage.setItem('ct_setup_config_' + email, JSON.stringify(saveable));
+        }
         if (typeof terminalLog === 'function') terminalLog('MENU: Structured weekly menu configuration saved ✓', 'ok');
         toggleWindow('win-menu-editor');
         
