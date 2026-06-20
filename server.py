@@ -1,6 +1,7 @@
 import http.server
 import urllib.request
-import os, json
+import os, json, smtplib, logging
+from email.mime.text import MIMEText
 
 NIM_TARGET = "https://integrate.api.nvidia.com/v1/chat/completions"
 ML_TARGET = "http://localhost:5000/predict"
@@ -216,6 +217,44 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(err_body)
                 except Exception: pass
+            return
+
+        if self.path == "/proxy/send-email":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length))
+            to_addr = body.get("to", "")
+            subject = body.get("subject", "CanteenTycoon AI Dispatch")
+            text = body.get("body", "")
+            smtp_host = os.environ.get("SMTP_HOST", "")
+            smtp_port = int(os.environ.get("SMTP_PORT", 587))
+            smtp_user = os.environ.get("SMTP_USER", "")
+            smtp_pass = os.environ.get("SMTP_PASS", "")
+            from_addr = os.environ.get("FROM_EMAIL", "noreply@canteentycoon.com")
+            if smtp_host and smtp_user:
+                try:
+                    msg = MIMEText(text, "plain", "utf-8")
+                    msg["Subject"] = subject
+                    msg["From"] = from_addr
+                    msg["To"] = to_addr
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+                        s.starttls()
+                        s.login(smtp_user, smtp_pass)
+                        s.send_message(msg)
+                    resp = {"sent": True, "to": to_addr}
+                    print(f"[EMAIL] Sent to {to_addr}: {subject}", flush=True)
+                except Exception as e:
+                    resp = {"sent": False, "error": str(e)}
+                    print(f"[EMAIL] Failed to {to_addr}: {e}", flush=True)
+            else:
+                resp = {"sent": True, "simulated": True, "to": to_addr, "note": "No SMTP configured, email simulated"}
+                print(f"[EMAIL] Simulated send to {to_addr}: {subject}", flush=True)
+            body_resp = json.dumps(resp).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body_resp)))
+            self.end_headers()
+            self.wfile.write(body_resp)
             return
 
         if self.path == "/proxy/ml/train":

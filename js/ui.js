@@ -983,6 +983,33 @@ async function processClaudeActions(text) {
     t = t.replace(/\[SAVE_MEMORY:[^\]]+\]/i, '').trim();
   }
 
+  // [SEND_EMAIL: to, subject, body] — send dispatch email to food shelter
+  const se = t.match(/\[SEND_EMAIL:\s*(.+?),?\s*(.+?),?\s*([\s\S]*?)\]/i);
+  if (se) {
+    const emailTo = se[1].trim() || setupConfig?.shelterEmail || '';
+    const emailSubject = se[2].trim() || 'CanteenTycoon AI Dispatch';
+    const emailBody = se[3].trim() || '';
+    t = t.replace(/\[SEND_EMAIL:[^\]]+\]/i, '').trim();
+    if (emailTo) {
+      try {
+        const res = await fetch('/proxy/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: emailTo, subject: emailSubject, body: emailBody })
+        });
+        const result = await res.json();
+        if (result.sent) {
+          terminalLog(`EMAIL: Sent to ${emailTo} (${result.simulated ? 'simulated' : 'delivered'})`, 'ok');
+          updateAILogsWindow('EMAIL', `Dispatch to ${emailTo}: ${emailSubject}`, 'SUCCESS');
+        } else {
+          terminalLog(`EMAIL: Failed - ${result.error}`, 'err');
+        }
+      } catch(e) {
+        terminalLog(`EMAIL: Error - ${e.message}`, 'err');
+      }
+    }
+  }
+
   // [TRAIN_MODEL] — send confirmed waste records to LightGBM for retraining
   if (/\[TRAIN_MODEL\]/i.test(t)) {
     t = t.replace(/\[TRAIN_MODEL\]/gi, '').trim();
@@ -1154,8 +1181,10 @@ ACTION TAGS — add any of these to your response to trigger actions (tags are r
   - Example: [SAVE_MEMORY: waste, {"date":"2026-06-22","menu":"Rice","predicted":4.5,"actual":null,"weather":"Sunny"}]
   - Example: [SAVE_MEMORY: chat, {"summary":"Discussed Monday forecast","keyPoints":["Pasta predicted 3.8kg","Will follow up Monday"]}]
 - [TRAIN_MODEL] — sends all saved waste records (where actual outcome was confirmed) to retrain the LightGBM model on the server
+- [SEND_EMAIL: to, subject, body] — sends a dispatch email to the food shelter (e.g., [SEND_EMAIL: shelter@example.org, Food Rescue, 12.5kg pasta rescued today])
+  - To auto-use the shelter email: [SEND_EMAIL: auto, Dispatch Notification, Body text here]
 
-You decide which tags to use based on what the user asks. Use [RUN_FORECAST] when asked for predictions. Use [WIDGETS] to reflect impact scores. Use [GENERATE_PDF] to create documents. Use [SAVE_MEMORY] to log outcomes you learned from the manager. Use [TRAIN_MODEL] when enough actual data has been collected to retrain. You are in full control — the system executes whatever tags you include.
+You decide which tags to use based on what the user asks. Use [RUN_FORECAST] when asked for predictions. Use [WIDGETS] to reflect impact scores. Use [GENERATE_PDF] to create documents. Use [SAVE_MEMORY] to log outcomes you learned from the manager. Use [TRAIN_MODEL] when enough actual data has been collected to retrain. Use [SEND_EMAIL] to notify the food shelter about rescues. You are in full control — the system executes whatever tags you include.
 8. Act as a general-purpose assistant — answer any question the manager has
 
 IMPORTANT FORMATTING RULES:

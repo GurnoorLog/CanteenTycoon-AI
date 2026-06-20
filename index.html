@@ -639,6 +639,7 @@ __loadEnv();
                     <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Manager Name</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. Mr. Davis" type="text" id="input-manager"/></div>
                     <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Manager Contact</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="Phone or email" type="text" id="input-contact"/></div>
                     <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Receiving Shelter</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. City Food Bank" type="text" id="input-shelter"/></div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Shelter Email <span class="text-slate-400 font-normal">(for dispatch notices)</span></label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. foodbank@example.org" type="email" id="input-shelter-email"/></div>
                 </div>
                 <div class="mt-lg flex justify-between items-center"><button class="text-on-surface-variant font-label-lg uppercase underline hover:text-deep-slate-navy transition-colors" onclick="prevStep(3)">Back</button><button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="finishSetup()">Finalize Config <span class="material-symbols-outlined">bolt</span></button></div>
             </div>
@@ -823,7 +824,7 @@ __loadEnv();
             <div class="mt-2 flex justify-between items-center">
                 <span class="text-[10px] font-mono text-green-600" id="calendar-event-badge">✅ No events</span>
                 <div class="flex gap-2">
-                    <span id="calendar-google-sync" class="text-secondary underline text-[10px] font-mono cursor-pointer hidden" onclick="fetchFromGoogleCalendar()">🔄 Sync Google</span>
+
                     <span class="text-primary underline text-[10px] font-mono cursor-pointer" onclick="calendarAddEvent()">+ Add Event</span>
                 </div>
             </div>
@@ -1348,6 +1349,7 @@ __loadEnv();
         managerName: '',
         managerContact: '',
         shelterName: '',
+        shelterEmail: '',
         cafeteriaPhoto: null,
         googleUser: null
     };
@@ -1442,6 +1444,7 @@ __loadEnv();
         setupConfig.managerName = name;
         setupConfig.managerContact = contact;
         setupConfig.shelterName = shelter;
+        setupConfig.shelterEmail = (document.getElementById('input-shelter-email')?.value || '').trim();
         setupConfig.cafeteriaPhoto = photoInput.files[0];
 
         // Save config per Google user (for auto-restore on next sign-in)
@@ -1795,10 +1798,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             document.getElementById('gsi-error').classList.add('hidden');
             console.log('[Google] Signed in as', payload.email);
             
-            // Show the Google Sync button in calendar
-            const syncBtn = document.getElementById('calendar-google-sync');
-            if (syncBtn) syncBtn.classList.remove('hidden');
-            
             // Restore previous setup config for this user
             const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
             if (savedConfig) {
@@ -1849,8 +1848,31 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             document.getElementById('gsi-email').textContent = user.email;
             document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
             document.getElementById('gsi-error').classList.add('hidden');
-            const syncBtn = document.getElementById('calendar-google-sync');
-            if (syncBtn) syncBtn.classList.remove('hidden');
+            // Restore saved setup config for this user
+            const savedConfig = localStorage.getItem('ct_setup_config_' + user.email);
+            if (savedConfig) {
+                try {
+                    const parsed = JSON.parse(savedConfig);
+                    Object.assign(setupConfig, parsed);
+                    const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                    fill('input-canteen', parsed.canteenName);
+                    fill('input-location', parsed.location);
+                    fill('input-students', parsed.avgStudents);
+                    fill('input-staff', parsed.staffCount);
+                    fill('input-efficiency', parsed.efficiencyGoal);
+                    fill('input-open', parsed.openTime);
+                    fill('input-close', parsed.closeTime);
+                    fill('input-manager-name', parsed.managerName);
+                    fill('input-manager-contact', parsed.managerContact);
+                    fill('input-shelter', parsed.shelterName);
+                    if (parsed.weeklyMenu) {
+                        for (const [d, v] of Object.entries(parsed.weeklyMenu)) {
+                            fill('input-' + d, v);
+                        }
+                    }
+                    console.log('[Google] Restored config for', user.email);
+                } catch(e) { console.warn('[Google] Config restore failed', e); }
+            }
             console.log('[Google] Restored session for', user.email);
         } catch(e) { console.warn('[Google] Session restore failed', e); }
     }
@@ -2289,12 +2311,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         document.getElementById('calendar-event-badge').textContent =
             todayEvents.length ? `✅ ${todayEvents.length} event(s) today` : '✅ No events today';
 
-        const syncBtn = document.getElementById('calendar-google-sync');
-        if (syncBtn) {
-            if (setupConfig?.googleUser) syncBtn.classList.remove('hidden');
-            else syncBtn.classList.add('hidden');
-        }
-
         renderCalendarEvents();
     }
 
@@ -2316,13 +2332,37 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     function calendarClickDay(dateKey) {
-        const title = prompt('Enter event for ' + dateKey + ':');
-        if (title && title.trim()) {
-            calendarEvents.push({ date: dateKey, title: title.trim() });
-            localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
-            renderCalendar();
-            if (setupConfig?.googleUser) syncToGoogleCalendar(dateKey, title.trim());
-        }
+        showEventEditor(dateKey, '');
+    }
+
+    function showEventEditor(dateKey, existingTitle) {
+        const existing = document.getElementById('calendar-event-editor');
+        if (existing) existing.remove();
+        const editor = document.createElement('div');
+        editor.id = 'calendar-event-editor';
+        editor.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;';
+        editor.innerHTML = `<div style="background:#fff;border:2px solid #1e293b;border-radius:8px;padding:24px;min-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+            <p style="font-size:14px;font-weight:700;text-transform:uppercase;color:#1e293b;margin:0 0 4px;">Add Event</p>
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;">${dateKey}</p>
+            <input id="ee-input" type="text" placeholder="Event name..." value="${existingTitle}" style="width:100%;padding:10px 12px;border:2px solid #cbd5e1;border-radius:6px;font-size:14px;box-sizing:border-box;outline:none;">
+            <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+                <button onclick="this.closest('#calendar-event-editor').remove()" style="padding:8px 16px;border:2px solid #cbd5e1;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;font-weight:600;">Cancel</button>
+                <button onclick="saveEventEditor('${dateKey}')" style="padding:8px 16px;border:2px solid #6366f1;border-radius:6px;background:#6366f1;color:#fff;font-size:13px;cursor:pointer;font-weight:600;">Save</button>
+            </div>
+        </div>`;
+        document.body.appendChild(editor);
+        setTimeout(() => document.getElementById('ee-input')?.focus(), 100);
+    }
+
+    function saveEventEditor(dateKey) {
+        const input = document.getElementById('ee-input');
+        const title = input ? input.value.trim() : '';
+        if (!title) { document.getElementById('calendar-event-editor')?.remove(); return; }
+        calendarEvents.push({ date: dateKey, title });
+        localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+        renderCalendar();
+        document.getElementById('calendar-event-editor')?.remove();
+        if (setupConfig?.googleUser) syncToGoogleCalendar(dateKey, title);
     }
 
     function calendarAddEvent() {
@@ -2369,66 +2409,72 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync calendar: Not signed in or SDK not loaded', 'warn');
             return;
         }
+        // Check if we have a cached token that's still valid
+        const cached = (() => { try { return JSON.parse(localStorage.getItem('ct_google_token')); } catch(e) { return null; } })();
+        if (cached && cached.access_token && Date.now() < cached.expiry) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Using cached Calendar token', 'ok');
+            return fetchCalendarEvents(cached.access_token);
+        }
         try {
             const clientId = localStorage.getItem('ct_google_client_id') || window.__ENV?.GOOGLE_CLIENT_ID || '';
             if (!clientId) return;
-            if (typeof terminalLog === 'function') terminalLog('[Google] Requesting token to read Calendar events...', 'run');
+            if (typeof terminalLog === 'function') terminalLog('[Google] Requesting Calendar access...', 'run');
             const tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
                 scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events',
                 prompt: silent ? '' : 'consent',
                 callback: async (resp) => {
-                    if (resp.access_token) {
-                        if (resp.error) {
-                            if (typeof terminalLog === 'function') terminalLog('[Google] Silent token refresh failed (normal on first time): ' + resp.error, 'warn');
-                            // If silent failed, try with prompt
-                            if (silent) {
-                                setTimeout(() => fetchFromGoogleCalendar(false), 500);
-                            }
-                            return;
-                        }
-                        if (typeof terminalLog === 'function') terminalLog('[Google] Token acquired, fetching events...', 'run');
-                        try {
-                            const now = new Date();
-                            const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-                            const timeMax = new Date(now.getFullYear(), now.getMonth() + 3, 1).toISOString();
-                            const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}&maxResults=100`;
-                            const res = await fetch(url, {
-                                headers: { 'Authorization': 'Bearer ' + resp.access_token }
-                            });
-                            if (res.status === 403) throw new Error(`Google Calendar API returned 403 — enable "Google Calendar API" at https://console.cloud.google.com/apis/library/calendar.googleapis.com`);
-                            if (!res.ok) throw new Error(`Google Calendar API returned ${res.status}`);
-                            const data = await res.json();
-                            let addedCount = 0;
-                            if (data.items) {
-                                data.items.forEach(item => {
-                                    const start = item.start?.date || item.start?.dateTime?.split('T')[0];
-                                    const title = item.summary;
-                                    if (start && title) {
-                                        const exists = calendarEvents.some(e => e.date === start && e.title.toLowerCase() === title.toLowerCase());
-                                        if (!exists) {
-                                            calendarEvents.push({ date: start, title: title.trim() });
-                                            addedCount++;
-                                        }
-                                    }
-                                });
-                                if (addedCount > 0) {
-                                    localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
-                                    renderCalendar();
-                                    if (typeof terminalLog === 'function') terminalLog(`[Google] Synced ${addedCount} event(s) from Google Calendar!`, 'ok');
-                                } else {
-                                    if (typeof terminalLog === 'function') terminalLog('[Google] Calendar is up-to-date.', 'ok');
-                                }
-                            }
-                        } catch (e) {
-                            if (typeof terminalLog === 'function') terminalLog(`[Google] Failed to fetch events: ${e.message}`, 'err');
-                        }
+                    if (resp.error) {
+                        if (typeof terminalLog === 'function') terminalLog('[Google] ' + (silent ? 'Silent ' : '') + 'token error: ' + resp.error, 'warn');
+                        if (silent) setTimeout(() => fetchFromGoogleCalendar(false), 500);
+                        return;
                     }
+                    if (!resp.access_token) return;
+                    // Cache token for reuse (expires_in is seconds from now)
+                    localStorage.setItem('ct_google_token', JSON.stringify({
+                        access_token: resp.access_token,
+                        expiry: Date.now() + (resp.expires_in || 3600) * 1000 - 60000 // 1 min buffer
+                    }));
+                    if (typeof terminalLog === 'function') terminalLog('[Google] Token cached, fetching events...', 'ok');
+                    await fetchCalendarEvents(resp.access_token);
                 }
             });
             tokenClient.requestAccessToken();
         } catch (err) {
-            if (typeof terminalLog === 'function') terminalLog(`[Google] OAuth client error: ${err.message}`, 'err');
+            if (typeof terminalLog === 'function') terminalLog('[Google] OAuth error: ' + err.message, 'err');
+        }
+    }
+
+    async function fetchCalendarEvents(accessToken) {
+        try {
+            const now = new Date();
+            const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+            const timeMax = new Date(now.getFullYear(), now.getMonth() + 3, 1).toISOString();
+            const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}&maxResults=100`;
+            const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            if (res.status === 403) throw new Error(`Google Calendar API returned 403 — enable "Google Calendar API" at https://console.cloud.google.com/apis/library/calendar.googleapis.com`);
+            if (!res.ok) throw new Error(`Google Calendar API returned ${res.status}`);
+            const data = await res.json();
+            let addedCount = 0;
+            if (data.items) {
+                data.items.forEach(item => {
+                    const start = item.start?.date || item.start?.dateTime?.split('T')[0];
+                    const title = item.summary;
+                    if (start && title) {
+                        const exists = calendarEvents.some(e => e.date === start && e.title.toLowerCase() === title.toLowerCase());
+                        if (!exists) { calendarEvents.push({ date: start, title: title.trim() }); addedCount++; }
+                    }
+                });
+                if (addedCount > 0) {
+                    localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+                    renderCalendar();
+                    if (typeof terminalLog === 'function') terminalLog(`[Google] Synced ${addedCount} event(s) from Google Calendar!`, 'ok');
+                } else {
+                    if (typeof terminalLog === 'function') terminalLog('[Google] Calendar is up-to-date.', 'ok');
+                }
+            }
+        } catch (e) {
+            if (typeof terminalLog === 'function') terminalLog(`[Google] Failed to fetch events: ${e.message}`, 'err');
         }
     }
     window.fetchFromGoogleCalendar = fetchFromGoogleCalendar;
