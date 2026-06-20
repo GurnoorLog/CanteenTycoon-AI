@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CanteenTycoon AI - Desktop OS</title>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&amp;family=VT323&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary": "#b61722",
+            "secondary-fixed": "#ffdad7",
+            "tertiary": "#855300",
+            "surface-container-low": "#f2f3ff",
+            "on-secondary": "#ffffff",
+            "inverse-on-surface": "#eef0ff",
+            "surface-dim": "#d2d9f4",
+            "secondary-container": "#da3437",
+            "surface-variant": "#dae2fd",
+            "background": "#f1f5f9",
+            "on-surface": "#131b2e",
+            "on-secondary-fixed": "#410004",
+            "primary-fixed": "#6ffbbe",
+            "secondary-fixed-dim": "#ffb3ad",
+            "on-error-container": "#93000a",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed-variant": "#930013",
+            "inverse-surface": "#283044",
+            "tertiary-fixed": "#ffddb8",
+            "outline": "#6c7a71",
+            "error-container": "#ffdad6",
+            "surface-container-highest": "#dae2fd",
+            "inverse-primary": "#4edea3",
+            "on-primary": "#ffffff",
+            "on-surface-main": "#131b2e",
+            "tertiary-container": "#e29100",
+            "surface-container-lowest": "#ffffff",
+            "surface": "#faf8ff",
+            "on-error": "#ffffff",
+            "on-tertiary-fixed": "#2a1700",
+            "on-primary-container": "#00422b",
+            "surface-tint": "#006c49",
+            "on-tertiary-container": "#523200",
+            "on-primary-fixed-variant": "#005236",
+            "error": "#ba1a1a",
+            "surface-bg": "#f1f5f9",
+            "on-tertiary-fixed-variant": "#653e00",
+            "on-primary-fixed": "#002113",
+            "surface-container-high": "#e2e7ff",
+            "deep-slate-navy": "#0f172a",
+            "primary-container": "#10b981",
+            "on-background": "#131b2e",
+            "surface-card": "#ffffff",
+            "surface-container": "#eaedff",
+            "primary": "#006c49",
+            "primary-fixed-dim": "#4edea3",
+            "on-surface-variant": "#3c4a42",
+            "outline-variant": "#bbcabf",
+            "tertiary-fixed-dim": "#ffb95f",
+            "surface-bright": "#faf8ff",
+            "on-surface-muted": "#3c4a42",
+            "on-secondary-container": "#fffbff",
+            "brix-folder": "#FFD04D"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xs": "8px",
+            "lg": "40px",
+            "md": "24px",
+            "border-width": "4px",
+            "shadow-offset": "6px",
+            "sm": "16px"
+          },
+          "fontFamily": {
+            "sans": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["VT323", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #f1f5f9;
+      /* Subtle pixel wave shader simulation */
+      background-image: 
+        radial-gradient(#006c49 0.5px, transparent 0.5px), 
+        linear-gradient(to bottom, #f1f5f9, #e2e7ff);
+      background-size: 20px 20px, 100% 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .os-window {
+      background: white;
+      border: 4px solid #0f172a;
+      box-shadow: 6px 6px 0px 0px #0f172a;
+      border-radius: 8px;
+    }
+
+    .os-titlebar {
+      background: white;
+      border-bottom: 4px solid #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      cursor: grab;
+    }
+
+    .os-titlebar:active {
+      cursor: grabbing;
+    }
+
+    .window-button {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #0f172a;
+      border-radius: 2px;
+    }
+
+    .folder-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      width: 80px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .folder-item:hover {
+      transform: scale(1.05);
+    }
+
+    .taskbar {
+      height: 48px;
+      background: white;
+      border-top: 4px solid #0f172a;
+      z-index: 100;
+    }
+
+    .desktop-icon {
+      width: 64px;
+      height: 64px;
+      filter: drop-shadow(2px 2px 0px #0f172a);
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    /* Custom Scrollbar for OS Windows */
+    .os-content::-webkit-scrollbar {
+      width: 8px;
+    }
+    .os-content::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .os-content::-webkit-scrollbar-thumb {
+      background: #0f172a;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="font-sans text-on-surface">
+<!-- Desktop Workspace -->
+<main class="relative w-full h-[calc(100vh-48px)] p-8 overflow-hidden">
+<!-- Desktop Icons (Floating) -->
+<div class="absolute top-8 right-8 flex flex-col gap-8 items-center">
+<div class="group cursor-pointer flex flex-col items-center">
+<img alt="Star Icon" class="desktop-icon mb-1" src="https://lh3.googleusercontent.com/aida/AP1WRLu_2xfvP94WjCs9wKnT47V77vj3z_LlxC_HDMYEk23XWfRqpJggyebBvhNQ6F8BXQ1inIuH_rO1OopDXxcHJ6Ub4JxrhKQGdsh6tjNzBT_UfeY1DQ8LmbSmdQTk3Bq4pY9twrQVZKX9My0YqTUx1NT4T5s4ts4qvN8aUe9BqokOBBG8NP1ExKGp-XR5eqK-ywZ60eE80Ex4HFgvSTPqEE9QNTitOetfAaUklVmz95ALEz_wAgfDCnoPmwg"/>
+<span class="text-[10px] font-bold bg-deep-slate-navy text-white px-2 py-0.5 rounded-full">SYSTEM_CORE</span>
+</div>
+<div class="group cursor-pointer flex flex-col items-center">
+<img alt="Cloud Icon" class="desktop-icon mb-1" src="https://lh3.googleusercontent.com/aida/AP1WRLsIfRqLHSE8Dzi1uTlT_rOxqEB3JBH8BR0VWWW3o-uWJHmV5cPMp8Jax7eEBTeRp2DlHp1_qSaE0ra8HQ3G7Ep_-PK6UERlv9C8Xn7bqr9SiawJX6YIENipR3qGVfR6GtJ7T8AVcMf0ONEVg3DLlrGx4DlB1EQ3gWsHjJ8MmYuFDaa_FIcssygkD_7D_iJJL7ZKgC4cZGleKiXPJYqN3WI6bEuSoZW8Fhq-Gcc4auSucVKwX6zHgNLERGw"/>
+<span class="text-[10px] font-bold bg-deep-slate-navy text-white px-2 py-0.5 rounded-full">CLOUD_SYNC</span>
+</div>
+</div>
+<!-- MAIN WINDOW: Simulation Engine -->
+<div class="os-window absolute top-10 left-10 w-[480px] z-20">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<div class="w-4 h-4 bg-primary rounded-sm"></div>
+<span class="font-bold text-xs uppercase tracking-wider">Ecological Simulation v4.2</span>
+</div>
+<div class="flex gap-1.5">
+<div class="window-button bg-surface-container-low"></div>
+<div class="window-button bg-secondary"></div>
+</div>
+</div>
+<div class="os-content p-4">
+<div class="mb-4">
+<h1 class="text-2xl font-bold font-mono">SECTOR_07 TELEMETRY</h1>
+<p class="text-[10px] font-mono opacity-60">SNAPSHOT_2023.10.27_14:42:01</p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 border-2 border-deep-slate-navy bg-surface-container-low">
+<div class="text-[10px] font-bold uppercase opacity-60 mb-1">Efficiency</div>
+<div class="text-3xl font-mono font-bold text-primary">94.2%</div>
+<div class="h-1.5 bg-deep-slate-navy/10 mt-2">
+<div class="bg-primary h-full" style="width: 94.2%"></div>
+</div>
+</div>
+<div class="p-3 border-2 border-deep-slate-navy bg-surface-container-low">
+<div class="text-[10px] font-bold uppercase opacity-60 mb-1">Mood Index</div>
+<div class="text-2xl font-mono font-bold uppercase">Optimal</div>
+<p class="text-[8px] mt-1">Wait times &lt; 120s</p>
+</div>
+</div>
+<div class="mt-4 p-3 border-2 border-deep-slate-navy bg-deep-slate-navy text-white font-mono text-[10px] h-32 overflow-y-auto">
+          &gt; SYSTEM_READY...<br/>
+          &gt; CALIBRATING ECO-SENSORS...<br/>
+          &gt; WASTE REDUCTION TARGET: 30.0%<br/>
+          &gt; CURRENT STATUS: -28.4%<br/>
+          &gt; [OK] THERMAL MAPPING LOADED<br/>
+          &gt; [OK] AGENT FLEET ACTIVE
+        </div>
+</div>
+</div>
+<!-- AGENT TERMINAL WINDOW -->
+<div class="os-window absolute top-24 right-48 w-[400px] z-10">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"></path></svg>
+<span class="font-bold text-xs uppercase tracking-wider">Agent_Unit_01.sys</span>
+</div>
+<div class="flex gap-1.5">
+<div class="window-button"></div>
+<div class="window-button bg-secondary"></div>
+</div>
+</div>
+<div class="os-content p-6 flex flex-col items-center">
+<div class="w-32 h-32 border-4 border-deep-slate-navy bg-white p-2 mb-4">
+<img alt="Agent Avatar" class="w-full h-full object-contain grayscale" src="https://lh3.googleusercontent.com/aida/AP1WRLvLEiXDa9ECvHDJ94l-nEJZgi1eBSLgwvWbOIYnVMVyMhyXN9gyWTkJo3w8YYrn98tHdvNw7mz5DnVm1y8bPhDtrnZeYB5CmRahzGjsb3jyCFRA9tehCun1AGEsKGeRshykxHQkmHTQfC308OEo5eY6VxvM7BOvLwqqqnh3WtP3RcSNxhKz6juHeBBVmMaRkDvP_c43HIKKrB1ELl5Rq0-XbTN0_tTMPRVbVDIcFDzWThPre96Ne2IZEGM"/>
+</div>
+<h3 class="font-bold text-lg leading-tight text-center">Chef "Byte" Ramsay</h3>
+<p class="text-[10px] font-mono opacity-60 uppercase mb-4">Logic-Based Menu Optimization</p>
+<div class="w-full bg-surface-container-high border-2 border-deep-slate-navy p-3 font-mono text-[10px] mb-4">
+          &gt; Analyzing nutrient density...<br/>
+          &gt; Recalibrating spice levels...<br/>
+          &gt; SUCCESS: Margin +4%
+        </div>
+<button class="w-full py-2 bg-primary text-white font-bold text-xs uppercase border-2 border-deep-slate-navy shadow-[2px_2px_0px_0px_#0f172a] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all">
+          Open Full Terminal
+        </button>
+</div>
+</div>
+<!-- FOLDER GRID (Bottom Left) -->
+<div class="absolute bottom-12 left-10 grid grid-cols-4 gap-8">
+<div class="folder-item group">
+<div class="relative">
+<svg class="w-16 h-16 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<span class="absolute top-0 right-0 w-4 h-4 bg-error text-[8px] flex items-center justify-center text-white rounded-full font-bold border-2 border-deep-slate-navy">!</span>
+</div>
+<span class="font-bold text-[10px] font-mono tracking-tight text-on-surface-main">RECIPES_ROOT</span>
+</div>
+<div class="folder-item">
+<svg class="w-16 h-16 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<span class="font-bold text-[10px] font-mono tracking-tight text-on-surface-main">STAFF_LOGS</span>
+</div>
+<div class="folder-item">
+<svg class="w-16 h-16 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<span class="font-bold text-[10px] font-mono tracking-tight text-on-surface-main">ENERGY_MAP</span>
+</div>
+<div class="folder-item">
+<svg class="w-16 h-16 text-brix-folder opacity-60" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<span class="font-bold text-[10px] font-mono tracking-tight opacity-60">ARCHIVE</span>
+</div>
+</div>
+</main>
+<!-- TASKBAR / DOCK -->
+<nav class="taskbar fixed bottom-0 left-0 w-full flex items-center px-4 justify-between">
+<div class="flex items-center gap-4 h-full">
+<button class="bg-deep-slate-navy text-white px-4 h-8 flex items-center gap-2 font-bold text-xs uppercase">
+<div class="w-3 h-3 bg-primary-fixed-dim rounded-sm"></div>
+        System
+      </button>
+<div class="h-6 w-px bg-deep-slate-navy opacity-20"></div>
+<div class="flex gap-1">
+<div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary group transition-colors cursor-pointer flex items-center justify-center">
+<svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"></path></svg>
+</div>
+<div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary transition-colors cursor-pointer flex items-center justify-center">
+<svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-2 text-[10px] font-mono font-bold uppercase">
+<span class="status-dot bg-primary animate-pulse"></span>
+        OS_v1.0.4 - ONLINE
+      </div>
+<div class="flex flex-col items-end leading-none">
+<span class="text-xs font-bold font-mono">14:42:01</span>
+<span class="text-[8px] font-bold opacity-50 uppercase tracking-tighter">27 OCT 2023</span>
+</div>
+</div>
+</nav>
+</body></html>

@@ -1,0 +1,2468 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CanteenTycoon AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=VT323&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script>if(typeof lucide==='undefined')document.documentElement.classList.add('no-lucide');</script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+async function __loadEnv() {
+  try {
+    const res = await fetch('api.env');
+    if (!res.ok) return;
+    const text = await res.text();
+    const env = {};
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx === -1) continue;
+      env[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
+    }
+    window.__ENV = env;
+  } catch(e) { /* api.env not available */ }
+}
+__loadEnv();
+</script>
+<style>
+    :root {
+        --deep-slate-navy: #0f172a;
+        --surface-bg: #f1f5f9;
+        --game-emerald: #10b981;
+        --pixel-border: 4px;
+    }
+
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+    }
+
+    /* typing animation */
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 12px;
+        background: #f1f5f9;
+        border: 2px solid #0f172a;
+        border-radius: 8px;
+        width: fit-content;
+    }
+    .typing-indicator span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background-color: #0f172a;
+        border-radius: 50%;
+        animation: bounce 1.3s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.15s;
+    }
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+    @keyframes bounce {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-4px); }
+    }
+
+    * { box-sizing: border-box; }
+
+    /* === GLOBAL BODY (from Folder 3) === */
+    body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: var(--surface-bg);
+        color: var(--deep-slate-navy);
+        overflow-x: hidden;
+        margin: 0;
+    }
+
+    /* ============ FOLDER 3 — Welcome Gate ============ */
+    .pixel-font { font-family: 'VT323', monospace; }
+    .wave-bg {
+        background-color: var(--surface-bg);
+        background-image: radial-gradient(var(--game-emerald) 1px, transparent 1px);
+        background-size: 20px 20px;
+        position: relative;
+    }
+    .brix-card {
+        background: #ffffff;
+        border: var(--pixel-border) solid var(--deep-slate-navy);
+        border-radius: 24px;
+        box-shadow: 8px 8px 0px 0px rgba(15, 23, 42, 0.1);
+    }
+    .brix-button {
+        background: var(--game-emerald);
+        color: white;
+        border: var(--pixel-border) solid var(--deep-slate-navy);
+        border-radius: 12px;
+        box-shadow: 0px 4px 0px 0px var(--deep-slate-navy);
+        transition: all 0.1s ease;
+        font-weight: 800;
+    }
+    .brix-button:active {
+        transform: translateY(4px);
+        box-shadow: 0px 0px 0px 0px var(--deep-slate-navy);
+    }
+    .capsule-badge {
+        background: rgba(16, 185, 129, 0.1);
+        border: 2px solid var(--game-emerald);
+        border-radius: 9999px;
+        padding: 4px 16px;
+        color: var(--game-emerald);
+        font-weight: 700;
+        font-size: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .floating-sprite {
+        position: absolute;
+        pointer-events: none;
+        filter: drop-shadow(4px 4px 0px rgba(15, 23, 42, 0.1));
+        animation: floatG 3s ease-in-out infinite;
+    }
+    @keyframes floatG {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    /* ============ FOLDER 2 — Setup Wizard ============ */
+    .pixel-border {
+        border: 4px solid #0f172a;
+    }
+    .tactile-shadow {
+        box-shadow: 6px 6px 0px 0px #0f172a;
+    }
+    .tactile-button:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: 8px 8px 0px 0px #0f172a;
+    }
+    .tactile-button:active {
+        transform: translate(4px, 4px);
+        box-shadow: 2px 2px 0px 0px #0f172a;
+    }
+    .card-stack-container {
+        perspective: 1000px;
+    }
+    .stack-card {
+        transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.4s ease;
+        transform-origin: bottom center;
+    }
+    .stack-card.exit {
+        transform: translate(-150%, -20%) rotate(-15deg);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .pixel-float {
+        animation: floatF 4s ease-in-out infinite;
+    }
+    @keyframes floatF {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+    }
+    .dither-wave {
+        background-image: radial-gradient(#0f172a 1px, transparent 1px);
+        background-size: 8px 8px;
+        opacity: 0.05;
+    }
+    .step-chunk {
+        height: 12px;
+        width: 100%;
+        border: 3px solid #0f172a;
+        background: #fff;
+    }
+    .step-chunk.active {
+        background: #10b981;
+    }
+
+    /* ============ FOLDER 1 — Desktop OS ============ */
+    .desktop-body.echo-os {
+        background-color: #f1f5f9;
+        background-image:
+            radial-gradient(#006c49 0.5px, transparent 0.5px),
+            linear-gradient(to bottom, #f1f5f9, #e2e7ff);
+        background-size: 20px 20px, 100% 100%;
+    }
+    .desktop-body {
+        background-color: #f1f5f9;
+        background-image: radial-gradient(#006c49 0.5px, transparent 0.5px), linear-gradient(to bottom, #f1f5f9, #e2e7ff);
+        background-size: 20px 20px, 100% 100%;
+        position: relative;
+        height: 100vh;
+        overflow: hidden;
+    }
+    .os-window {
+        background: white;
+        border: 4px solid #0f172a;
+        box-shadow: 6px 6px 0px 0px #0f172a;
+        border-radius: 8px;
+    }
+    .os-titlebar {
+        background: white;
+        border-bottom: 4px solid #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        cursor: grab;
+    }
+    .os-titlebar:active { cursor: grabbing; }
+    .window-button {
+        width: 14px;
+        height: 14px;
+        border: 2px solid #0f172a;
+        border-radius: 2px;
+    }
+    .folder-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        width: 80px;
+        cursor: pointer;
+        opacity: 1;
+        visibility: visible;
+    }
+    .folder-item:hover { transform: scale(1.05) !important; }
+    .taskbar {
+        height: 48px;
+        background: white;
+        border-top: 4px solid #0f172a;
+        z-index: 100;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    .desktop-icon {
+        width: 64px;
+        height: 64px;
+        filter: drop-shadow(2px 2px 0px #0f172a);
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 4px;
+    }
+    .os-content::-webkit-scrollbar { width: 8px; }
+    .os-content::-webkit-scrollbar-track { background: #f1f5f9; }
+    .os-content::-webkit-scrollbar-thumb { background: #0f172a; border-radius: 4px; }
+
+    /* Echo-specific widget and table styles */
+    .widget-card {
+        background: white;
+        border: 2px solid #0f172a;
+        padding: 16px;
+        box-shadow: 3px 3px 0px 0px #0f172a;
+    }
+    .widget-card .value { font-size: 28px; font-weight: 700; font-family: monospace; }
+    .widget-card .label { font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: 0.6; }
+    .os-window table { width: 100%; font-size: 10px; font-family: monospace; border-collapse: collapse; }
+    .os-window th { text-align: left; padding: 4px 8px; border-bottom: 2px solid #0f172a; font-weight: 700; }
+    .os-window td { padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+    .os-window tr:hover td { background: #eef2ff; }
+    .os-window .folder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .os-window .folder-grid > div { border: 1px solid #e2e8f0; padding: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 600; font-family: monospace; }
+    .os-window .folder-grid > div:hover { background: #eef2ff; border-color: #0f172a; }
+
+    /* Prediction Paper Window styling */
+    #win-prediction-paper {
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 4px solid #0f172a;
+        box-shadow: 8px 8px 0px 0px #0f172a;
+        border-radius: 8px;
+    }
+    @keyframes slideUp {
+        from { transform: translate(-50%, 20px); opacity: 0; }
+        to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    .glow-btn-active {
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+        animation: pulsingGlow 1.8s infinite ease-in-out;
+    }
+    @keyframes pulsingGlow {
+        0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+        50% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.9), 0 0 50px rgba(16,185,129,0.3); }
+    }
+    .pulse-leaf {
+        animation: pulseLeaf 2.5s infinite ease-in-out;
+    }
+    @keyframes pulseLeaf {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    /* Factor meter bars */
+    .pp-meter-track {
+        height: 10px;
+        background: #e2e8f0;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 99px;
+        overflow: hidden;
+        position: relative;
+    }
+    .pp-bar-fill {
+        height: 100%;
+        border-radius: 99px;
+        width: 0%;
+        transition: width 0.9s cubic-bezier(0.4,0,0.2,1);
+    }
+    /* Desktop readability improvements */
+    .os-window table { font-size: 12px; }
+    .os-window th { padding: 6px 10px; font-size: 11px; }
+    .os-window td { padding: 6px 10px; font-size: 12px; line-height: 1.5; }
+    .os-window .os-content { font-size: 12px; }
+
+
+    /* ============ SECTION TRANSITIONS ============ */
+    .section-transition {
+        transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Premium Polished UI Styles */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.45);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08), 
+                    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    }
+    
+    .glass-panel-dark {
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3), 
+                    inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    }
+
+    .glow-border {
+        position: relative;
+    }
+    .glow-border::after {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.5), rgba(99, 102, 241, 0.3));
+        border-radius: inherit;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    .glow-border:hover::after {
+        opacity: 1;
+    }
+
+    /* Scanner lines for map loading overlay */
+    .scanner-line {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(to bottom, rgba(16, 185, 129, 0), rgba(16, 185, 129, 0.8), rgba(16, 185, 129, 0));
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+        z-index: 10;
+        pointer-events: none;
+    }
+
+    /* Smooth interactive feedback */
+    .magnetic-btn-wrap {
+        display: inline-block;
+        transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* Override widget cards for premium glassmorphism */
+    .widget-card {
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 
+                    4px 4px 0px 0px rgba(15, 23, 42, 0.05);
+        border-radius: 16px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .widget-card:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.65);
+        border-color: rgba(16, 185, 129, 0.4);
+        box-shadow: 0 15px 30px -5px rgba(15, 23, 42, 0.08), 
+                    4px 4px 0px 0px #0f172a;
+    }
+
+    /* Custom OS Window Styling */
+    .os-window {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 2px solid #0f172a;
+        box-shadow: 8px 8px 0px 0px #0f172a;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .os-titlebar {
+        border-bottom: 2px solid #0f172a;
+        padding: 10px 16px;
+    }
+
+    /* Premium custom scrollbar */
+    .os-content::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .os-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .os-content::-webkit-scrollbar-thumb {
+        background: rgba(15, 23, 42, 0.2);
+        border-radius: 99px;
+    }
+    .os-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(15, 23, 42, 0.4);
+    }
+</style>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "secondary": "#b61722",
+                    "secondary-fixed": "#ffdad7",
+                    "tertiary": "#855300",
+                    "surface-container-low": "#f2f3ff",
+                    "on-secondary": "#ffffff",
+                    "inverse-on-surface": "#eef0ff",
+                    "surface-dim": "#d2d9f4",
+                    "secondary-container": "#da3437",
+                    "surface-variant": "#dae2fd",
+                    "background": "#f1f5f9",
+                    "on-surface": "#131b2e",
+                    "on-secondary-fixed": "#410004",
+                    "primary-fixed": "#6ffbbe",
+                    "secondary-fixed-dim": "#ffb3ad",
+                    "on-error-container": "#93000a",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#930013",
+                    "inverse-surface": "#283044",
+                    "tertiary-fixed": "#ffddb8",
+                    "outline": "#6c7a71",
+                    "error-container": "#ffdad6",
+                    "surface-container-highest": "#dae2fd",
+                    "inverse-primary": "#4edea3",
+                    "on-primary": "#ffffff",
+                    "on-surface-main": "#131b2e",
+                    "tertiary-container": "#e29100",
+                    "surface-container-lowest": "#ffffff",
+                    "surface": "#faf8ff",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed": "#2a1700",
+                    "on-primary-container": "#00422b",
+                    "surface-tint": "#006c49",
+                    "on-tertiary-container": "#523200",
+                    "on-primary-fixed-variant": "#005236",
+                    "error": "#ba1a1a",
+                    "surface-bg": "#f1f5f9",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "on-primary-fixed": "#002113",
+                    "surface-container-high": "#e2e7ff",
+                    "deep-slate-navy": "#0f172a",
+                    "primary-container": "#10b981",
+                    "on-background": "#131b2e",
+                    "surface-card": "#ffffff",
+                    "surface-container": "#eaedff",
+                    "primary": "#006c49",
+                    "primary-fixed-dim": "#4edea3",
+                    "on-surface-variant": "#3c4a42",
+                    "outline-variant": "#bbcabf",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "surface-bright": "#faf8ff",
+                    "on-surface-muted": "#3c4a42",
+                    "on-secondary-container": "#fffbff",
+                    "brix-folder": "#FFD04D"
+                },
+                borderRadius: {
+                    DEFAULT: "0.25rem",
+                    lg: "0.5rem",
+                    xl: "0.75rem",
+                    full: "9999px"
+                },
+                spacing: {
+                    xs: "8px",
+                    lg: "40px",
+                    md: "24px",
+                    "border-width": "4px",
+                    "shadow-offset": "6px",
+                    sm: "16px"
+                },
+                fontFamily: {
+                    sans: ["Plus Jakarta Sans", "sans-serif"],
+                    mono: ["VT323", "monospace"]
+                },
+                fontSize: {
+                    "label-lg": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "800"}],
+                    "headline-md": ["26px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "400"}],
+                    "label-md": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "800"}],
+                    "body-md": ["14px", {"lineHeight": "1.6", "fontWeight": "500"}],
+                    "display-lg": ["52px", {"lineHeight": "1.1", "letterSpacing": "0.08em", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "700"}]
+                }
+            },
+        },
+    }
+</script>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: WELCOME GATE (from Folder 3 — stitch...2) -->
+<!-- ============================================================ -->
+<section class="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden" id="welcome-gate">
+    <!-- Ambient Sprites -->
+    <img alt="Star" class="floating-sprite bottom-[20%] left-[10%] w-20" src="star.png" style="animation-delay: 0.5s;"/>
+    <img alt="Star" class="floating-sprite top-[30%] right-[15%] w-16" src="star.png" style="animation-delay: 1.5s;"/>
+    <img alt="Student 1" class="floating-sprite top-[25%] left-[18%] w-28" src="student1.png"/>
+    <img alt="Student 2" class="floating-sprite bottom-[25%] left-[25%] w-32" src="student2.png" style="animation-delay: 0.8s;"/>
+    <img alt="Cook" class="floating-sprite top-[20%] right-[20%] w-28" src="chef.png" style="animation-delay: 0.4s;"/>
+    <div class="z-10 text-center px-4 max-w-xl w-full">
+        <div class="brix-card p-12 flex flex-col items-center">
+            <div class="mb-6">
+                <span class="capsule-badge">🌱 FOOD WASTE RADAR</span>
+            </div>
+            <h1 class="pixel-font text-6xl uppercase mb-4 tracking-tight text-[#0f172a]">CANTEENTYCOON AI</h1>
+            <p class="text-slate-500 mb-10 font-medium text-sm leading-relaxed">Revolutionizing campus sustainability through <br/>high-fidelity simulation.</p>
+            <div class="w-full space-y-4">
+                <button class="brix-button px-10 py-5 w-full flex items-center justify-center gap-3 text-xl" onclick="showSetupWizard()">
+                    Create Your World ✨
+                </button>
+                <button class="brix-button px-10 py-3 w-full flex items-center justify-center gap-2 text-md" style="background: #475569;" onclick="openApiSettings()">
+                    Configure API Keys 🔑
+                </button>
+                <p class="pixel-font text-sm text-slate-400 mt-4">ENGINE_READY_v2.5</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: SETUP WIZARD (from Folder 1 — stitch...1) -->
+<!-- ============================================================ -->
+<div class="hidden" id="setup-wizard">
+    <!-- Top Navigation Bar -->
+    <header class="flex justify-between items-center w-full px-md py-xs bg-surface border-b-[3px] border-on-surface sticky top-0 z-50">
+        <div class="flex items-center gap-sm">
+            <h1 class="font-display-lg text-display-lg text-primary uppercase">CanteenTycoon AI</h1>
+        </div>
+        <div class="flex items-center gap-sm">
+            <button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" onclick="openApiSettings()">settings</button>
+        </div>
+    </header>
+    <main class="relative min-h-[calc(100vh-80px)] w-full flex items-center justify-center p-md overflow-hidden">
+        <div class="absolute inset-0 dither-wave pointer-events-none"></div>
+        <!-- Floating Characters -->
+        <img alt="Pixel Student" class="absolute top-[15%] left-[10%] w-28 h-28 pixel-float pointer-events-none" src="student1.png" style="animation-delay: 0s"/>
+        <img alt="Pixel Cook" class="absolute top-[20%] right-[12%] w-32 h-32 pixel-float pointer-events-none" src="chef.png" style="animation-delay: 0.8s"/>
+        <!-- Classic 4-card form (hidden by default, shown as fallback) -->
+        <div class="card-stack-container relative w-full max-w-xl h-[720px] hidden" id="classic-wizard-cards">
+            <div class="absolute -top-16 left-0 w-full flex gap-2 px-1">
+                <div class="step-chunk active" id="step-1-indicator"></div>
+                <div class="step-chunk" id="step-2-indicator"></div>
+                <div class="step-chunk" id="step-3-indicator"></div>
+                <div class="step-chunk" id="step-4-indicator"></div>
+            </div>
+            <!-- Card 1: School Profile -->
+            <div class="stack-card absolute inset-0 bg-white pixel-border tactile-shadow p-lg flex flex-col z-30" id="card-1">
+                <div class="mb-md">
+                    <span class="font-label-md text-label-md text-secondary uppercase tracking-widest">Phase 01</span>
+                    <h2 class="font-headline-md text-headline-md text-deep-slate-navy mt-xs">School Profile</h2>
+                </div>
+                <div class="flex-grow space-y-md overflow-y-auto">
+                    <div id="gsi-container" class="border-2 border-deep-slate-navy p-sm bg-surface-container-low text-center">
+                        <p class="font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Sign in with Google</p>
+                        <div id="gsi-button-wrapper" class="flex justify-center"></div>
+                        <p id="gsi-status" class="font-body-md text-sm text-on-surface-variant mt-xs hidden">Signed in as <span id="gsi-email"></span></p>
+                        <p id="gsi-error" class="font-body-md text-sm text-secondary mt-xs hidden"></p>
+                        <input type="hidden" id="input-google-token"/>
+                    </div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Canteen Name</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. Neo-Tokyo High Refectory" type="text" id="input-canteen"/></div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">School Location</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. Springfield, IL" type="text" id="input-location"/></div>
+                    <input type="hidden" id="input-calendar" value="normal"/>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Target Efficiency Goal (%)</label>
+                        <select class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" id="input-efficiency">
+                            <option>80% - Balanced Growth</option><option>90% - High Performance</option><option>99% - Peak Simulation</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-lg flex justify-end"><button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="nextStep(1)">Begin Logic <span class="material-symbols-outlined">arrow_forward</span></button></div>
+            </div>
+            <!-- Card 2 -->
+            <div class="stack-card absolute inset-0 bg-white pixel-border tactile-shadow p-lg flex flex-col z-10 scale-[0.9] translate-y-8 opacity-50" id="card-2">
+                <div class="mb-md"><span class="font-label-md text-label-md text-secondary uppercase tracking-widest">Phase 02</span><h2 class="font-headline-md text-headline-md text-deep-slate-navy mt-xs">Operations</h2></div>
+                <div class="flex-grow space-y-md overflow-y-auto">
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Average Daily Students</label><div class="relative"><input class="w-full h-4 bg-surface-container-high rounded-none appearance-none cursor-pointer border-2 border-deep-slate-navy accent-primary" max="2500" min="100" step="50" type="range" id="input-students"/></div></div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Available Staff Count</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="Enter number..." type="number" id="input-staff"/></div>
+                    <div class="grid grid-cols-2 gap-x-3">
+                        <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Opening Time</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" type="time" id="input-open" value="07:00"/></div>
+                        <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Closing Time</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" type="time" id="input-close" value="15:00"/></div>
+                    </div>
+                </div>
+                <div class="mt-lg flex justify-between items-center"><button class="text-on-surface-variant font-label-lg uppercase underline hover:text-deep-slate-navy transition-colors" onclick="prevStep(1)">Back</button><button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="nextStep(2)">Next Phase <span class="material-symbols-outlined">arrow_forward</span></button></div>
+            </div>
+            <!-- Card 3 -->
+            <div class="stack-card absolute inset-0 bg-white pixel-border tactile-shadow p-lg flex flex-col z-10 scale-[0.9] translate-y-8 opacity-50" id="card-3">
+                <div class="mb-md"><span class="font-label-md text-label-md text-secondary uppercase tracking-widest">Phase 03</span><h2 class="font-headline-md text-headline-md text-deep-slate-navy mt-xs">Weekly Menu</h2></div>
+                <div class="flex-grow flex flex-col gap-y-3 overflow-y-auto">
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Monday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-mon"><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option></select></div>
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Tuesday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-tue"><option value="Meat">Meat</option><option value="Rice">Rice</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option></select></div>
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Wednesday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-wed"><option value="Vegetables">Vegetables</option><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Soup">Soup</option></select></div>
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Thursday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-thu"><option value="Soup">Soup</option><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option></select></div>
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Friday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-fri"><option value="Rice">Rice</option><option value="Meat">Meat</option><option value="Vegetables">Vegetables</option><option value="Soup">Soup</option></select></div>
+                        <div><label class="block font-label-md text-[10px] text-deep-slate-navy uppercase mb-0.5">Saturday</label><select class="w-full pixel-border p-1.5 font-body-md text-xs focus:ring-0 focus:border-primary" id="input-sat"><option value="closed">Closed</option></select></div>
+                    </div>
+                </div>
+                <div class="mt-lg flex justify-between items-center"><button class="text-on-surface-variant font-label-lg uppercase underline hover:text-deep-slate-navy transition-colors" onclick="prevStep(2)">Back</button><button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="nextStep(3)">Next Phase <span class="material-symbols-outlined">arrow_forward</span></button></div>
+            </div>
+            <!-- Card 4 -->
+            <div class="stack-card absolute inset-0 bg-white pixel-border tactile-shadow p-lg flex flex-col z-10 scale-[0.9] translate-y-8 opacity-50" id="card-4">
+                <div class="mb-md"><span class="font-label-md text-label-md text-secondary uppercase tracking-widest">Phase 04</span><h2 class="font-headline-md text-headline-md text-deep-slate-navy mt-xs">Contacts &amp; Photo</h2></div>
+                <div class="flex-grow flex flex-col gap-y-3 overflow-y-auto">
+                    <label class="w-full cursor-pointer group"><div class="border-4 border-dashed border-deep-slate-navy p-4 flex flex-col items-center gap-1 bg-surface-bg hover:bg-surface-variant transition-colors"><span class="material-symbols-outlined text-3xl text-deep-slate-navy group-hover:scale-110 transition-transform">cloud_upload</span><span class="font-label-lg text-label-lg uppercase text-xs">Select Cafeteria Image</span></div><input class="hidden" type="file" accept="image/*" id="input-photo" onchange="document.getElementById('photo-filename').textContent=this.files[0]?.name||'No file selected'"/><span id="photo-filename" class="block text-xs font-mono text-on-surface-variant mt-1 text-center">No file selected</span></label>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Manager Name</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. Mr. Davis" type="text" id="input-manager"/></div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Manager Contact</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="Phone or email" type="text" id="input-contact"/></div>
+                    <div><label class="block font-label-md text-label-md text-deep-slate-navy uppercase mb-xs">Receiving Shelter</label><input class="w-full pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="e.g. City Food Bank" type="text" id="input-shelter"/></div>
+                </div>
+                <div class="mt-lg flex justify-between items-center"><button class="text-on-surface-variant font-label-lg uppercase underline hover:text-deep-slate-navy transition-colors" onclick="prevStep(3)">Back</button><button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="finishSetup()">Finalize Config <span class="material-symbols-outlined">bolt</span></button></div>
+            </div>
+        </div>
+        <!-- SUCCESS TOAST -->
+        <div class="fixed bottom-lg right-lg bg-primary text-white pixel-border tactile-shadow p-md translate-y-20 opacity-0 transition-all duration-500 z-[60] flex items-center gap-sm" id="success-toast">
+            <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            <div><p class="font-label-lg uppercase">Simulation Loaded</p><p class="font-body-md opacity-90">Initializing neural paths...</p></div>
+        </div>
+    </main>
+    <footer class="flex justify-between items-center px-lg py-md w-full bg-surface-container-highest border-t-[3px] border-on-surface fixed bottom-0 z-40">
+        <span class="font-label-md text-label-md text-secondary uppercase">© 2026 CanteenTycoon AI</span>
+        <div class="flex items-center gap-xs"><div class="w-3 h-3 bg-primary animate-pulse"></div><span class="font-label-md text-label-md text-on-surface uppercase">System Operational</span></div>
+    </footer>
+</div>
+
+
+<!-- AI Intro Chat Card (between wizard finish and loading/map generation) -->
+<div class="fixed inset-0 z-[90] bg-surface-bg flex items-center justify-center hidden" id="ai-intro-card">
+    <div class="bg-white pixel-border tactile-shadow p-lg max-w-2xl w-full mx-4 flex flex-col" style="height:85vh;max-height:700px;">
+        <div class="flex items-center gap-3 mb-md border-b-2 border-deep-slate-navy pb-md">
+            <div class="w-10 h-10 bg-deep-slate-navy rounded-full flex items-center justify-center">
+                <span class="text-white font-bold text-lg">AI</span>
+            </div>
+            <div>
+                <h2 class="font-headline-md text-headline-md text-deep-slate-navy">CanteenTycoon Assistant</h2>
+                <p class="font-body-md text-xs text-on-surface-variant">Let me understand your cafeteria before we begin</p>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-4 px-1" id="ai-intro-messages"></div>
+        <div class="mt-md pt-md border-t-2 border-deep-slate-navy flex gap-2">
+            <input class="flex-1 pixel-border p-sm font-body-md focus:ring-0 focus:border-primary" placeholder="Type your response..." type="text" id="ai-intro-input" onkeydown="if(event.key==='Enter')sendAiIntroMessage()"/>
+            <button class="tactile-button bg-primary text-white pixel-border px-lg py-sm font-label-lg uppercase flex items-center gap-xs" onclick="sendAiIntroMessage()">
+                Send
+                <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay (outside setup-wizard so it's not hidden by it) -->
+<div class="fixed inset-0 z-[100] bg-surface-bg flex items-center justify-center hidden" id="loading-overlay">
+    <div class="bg-white pixel-border tactile-shadow p-lg max-w-lg w-full mx-4 text-center">
+        <div id="loading-stage-1">
+            <div class="relative w-full h-32 bg-slate-950 border border-emerald-500/20 mb-6 overflow-hidden rounded-xl shadow-inner">
+                <div class="absolute inset-0 opacity-10" style="background-image: linear-gradient(to right, #10b981 1px, transparent 1px), linear-gradient(to bottom, #10b981 1px, transparent 1px); background-size: 16px 16px;"></div>
+                <div class="scanner-line" id="scanner-line-el" style="top: 0%"></div>
+                <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-t from-emerald-950/20 to-transparent">
+                    <div class="animate-spin w-8 h-8 border-2 border-slate-800 border-t-emerald-400 rounded-full"></div>
+                    <span class="text-emerald-400 font-mono text-[9px] tracking-widest animate-pulse">[ PROCEDURAL_MAP_GENERATION ]</span>
+                </div>
+            </div>
+            <h2 class="font-headline-md text-headline-md text-deep-slate-navy mb-sm">AI is generating your cafeteria map...</h2>
+            <p class="font-body-md text-on-surface-variant text-sm">Analyzing your photo with Gemini AI to create a pixel-art layout.</p>
+            <div class="mt-md h-2 bg-surface-container-high border border-deep-slate-navy rounded-full overflow-hidden"><div class="bg-primary h-full" id="loading-bar" style="width:30%"></div></div>
+            <p class="font-mono text-xs text-on-surface-variant mt-sm" id="loading-status">Initializing...</p>
+        </div>
+        <div id="loading-stage-2" class="hidden">
+            <div class="w-full aspect-square bg-surface-container-high border-4 border-deep-slate-navy mb-md flex items-center justify-center overflow-hidden" id="map-preview-container">
+                <img id="map-preview-img" class="w-full h-full object-contain hidden"/>
+                <span class="text-on-surface-variant font-mono text-sm" id="map-preview-placeholder">Map generated successfully!</span>
+            </div>
+            <div class="flex gap-2">
+                <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase hover:bg-primary-container transition-colors" onclick="completeLoading()">
+                    Continue to Desktop →
+                </button>
+                <button class="bg-secondary text-white pixel-border py-sm px-4 font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="openApiSettings()">
+                    🔑 Configure Keys
+                </button>
+                <button class="bg-secondary text-white pixel-border py-sm px-4 font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="generateMapAgain()">
+                    ↻ Retry
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Settings Modal -->
+<div class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center hidden" id="api-settings-modal">
+    <div class="bg-white pixel-border tactile-shadow p-lg max-w-md w-full mx-4">
+        <div class="flex justify-between items-center mb-md">
+            <h3 class="font-headline-md text-headline-md text-deep-slate-navy uppercase">API Configuration</h3>
+            <button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors font-bold text-xl" onclick="closeApiSettings()">close</button>
+        </div>
+        <p class="font-body-md text-xs text-on-surface-variant mb-md leading-relaxed">
+            Keys are saved in your browser's local storage. On a local server, load from <code class="bg-surface-container-high px-1">api.env</code> (copy from <code class="bg-surface-container-high px-1">api.env.template</code>).
+        </p>
+        <div class="space-y-sm">
+            <div>
+                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">🤖 Claude API Key <span class="text-primary">(Primary — Required)</span></label>
+                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="sk-ant-api03-..." type="password" id="input-api-claude"/>
+                <p class="text-[10px] text-slate-400 mt-1">Powers all AI: intent routing, wizard, forecasting, chat. Get one at console.anthropic.com</p>
+            </div>
+            <div>
+                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">📷 Gemini API Key <span class="text-slate-400 font-normal">(Map generation)</span></label>
+                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="AIzaSy..." type="password" id="input-api-gemini"/>
+            </div>
+            <div>
+                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">📱 Google Client ID <span class="text-slate-400 font-normal">(Sign-In + Calendar)</span></label>
+                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="xxx.apps.googleusercontent.com" type="text" id="input-api-google"/>
+            </div>
+        </div>
+        <div class="mt-lg flex gap-2">
+            <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase hover:bg-primary-container transition-colors" onclick="saveApiSettings()">
+                Save Keys
+            </button>
+            <button class="bg-secondary text-white pixel-border px-4 py-sm font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="closeApiSettings()">
+                Cancel
+            </button>
+        </div>
+        <!-- Legacy hidden field for NIM compatibility -->
+        <input type="hidden" id="input-api-nvidia" value=""/>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: DESKTOP OS (from echo — enhanced) -->
+<!-- ============================================================ -->
+<div class="hidden desktop-body echo-os" id="desktop-os">
+    <!-- DESKTOP WIDGETS (dynamically updated by JS) -->
+    <div class="absolute top-8 left-8 flex flex-col gap-6 z-10">
+        <div class="widget-card w-48">
+            <div class="label flex items-center gap-2 mb-1">
+                <i data-lucide="zap" class="w-3 h-3 text-primary"></i> Efficiency
+            </div>
+            <div class="value text-primary" id="widget-efficiency">--</div>
+            <div class="h-2 bg-deep-slate-navy/10 mt-2 border border-deep-slate-navy">
+                <div class="bg-primary h-full" id="widget-efficiency-bar" style="width:0%"></div>
+            </div>
+        </div>
+        <div class="widget-card w-48">
+            <div class="label flex items-center gap-2 mb-1">
+                <i data-lucide="smile" class="w-3 h-3 text-primary"></i> Mood Index
+            </div>
+            <div class="value text-primary" id="widget-mood">--</div>
+            <p class="text-[8px] mt-1 font-bold" id="widget-mood-detail">Initializing...</p>
+        </div>
+        <div class="widget-card w-48">
+            <div class="label flex items-center gap-2 mb-1">
+                <i data-lucide="leaf" class="w-3 h-3 text-primary"></i> Waste Reduction
+            </div>
+            <div class="value text-primary" id="widget-waste-red">--</div>
+            <p class="text-[8px] mt-1 font-bold" id="widget-co2-offset">Today's CO₂ Offset: --</p>
+        </div>
+        <div class="widget-card w-48">
+            <div class="label flex items-center gap-2 mb-1">
+                <i data-lucide="banknote" class="w-3 h-3 text-primary"></i> Meals Saved
+            </div>
+            <div class="value text-primary" id="widget-meals">--</div>
+            <p class="text-[8px] mt-1 font-bold" id="widget-meals-detail">People fed today</p>
+        </div>
+    </div>
+    <!-- Desktop Icons (Right aligned) -->
+    <div class="absolute top-8 right-8 flex flex-col gap-8 items-center z-40">
+        <div class="group cursor-pointer flex flex-col items-center" onclick="toggleWindow('win-chat')">
+            <div class="w-16 h-16 bg-deep-slate-navy flex items-center justify-center border-4 border-white shadow-[2px_2px_0px_0px_#0f172a] mb-1">
+                <i data-lucide="message-circle" class="w-10 h-10 text-white"></i>
+            </div>
+            <span class="text-[10px] font-bold bg-deep-slate-navy text-white px-2 py-0.5 rounded-full uppercase">CMD_CORE</span>
+        </div>
+        <div class="group cursor-pointer flex flex-col items-center" onclick="toggleWindow('win-simulation')">
+            <div class="w-16 h-16 bg-primary flex items-center justify-center border-4 border-white shadow-[2px_2px_0px_0px_#0f172a] mb-1 group-hover:bg-primary-container transition-colors">
+                <i data-lucide="cpu" class="w-10 h-10 text-white"></i>
+            </div>
+            <span class="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded-full uppercase tracking-wider">SIMULATION</span>
+        </div>
+    </div>
+    <!-- WINDOW: Weather (dynamically updated by JS -- ui.js creates this) -->
+    <!-- WINDOW: Calendar -->
+    <div class="os-window absolute top-20 right-20 w-[400px] z-50 hidden" id="win-calendar">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4"></i><span class="font-bold text-[10px] uppercase tracking-wider">SCHEDULER_CORE</span></div>
+            <div class="window-button bg-secondary" onclick="toggleWindow('win-calendar')"></div>
+        </div>
+        <div class="os-content p-4">
+            <div class="flex justify-between items-center mb-4">
+                <button class="p-1 hover:bg-surface-container"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                <h3 class="font-bold uppercase text-xs" id="calendar-month-label"></h3>
+                <button class="p-1 hover:bg-surface-container"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+            </div>
+            <div class="grid grid-cols-7 gap-px bg-deep-slate-navy border-2 border-deep-slate-navy" id="calendar-grid"></div>
+            <div class="mt-2 flex justify-between items-center">
+                <span class="text-[10px] font-mono text-green-600" id="calendar-event-badge">✅ No events</span>
+                <div class="flex gap-2">
+                    <span id="calendar-google-sync" class="text-secondary underline text-[10px] font-mono cursor-pointer hidden" onclick="fetchFromGoogleCalendar()">🔄 Sync Google</span>
+                    <span class="text-primary underline text-[10px] font-mono cursor-pointer" onclick="calendarAddEvent()">+ Add Event</span>
+                </div>
+            </div>
+            <div id="calendar-event-list" class="mt-2 space-y-1 max-h-[120px] overflow-y-auto"></div>
+        </div>
+    </div>
+    <!-- WINDOW: Waste Logs -->
+    <div class="os-window absolute top-32 left-40 w-[600px] z-50 hidden" id="win-waste-logs">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i><span class="font-bold text-[10px] uppercase tracking-wider">WASTE_INVENTORY.xls</span></div>
+            <div class="window-button bg-secondary" onclick="toggleWindow('win-waste-logs')"></div>
+        </div>
+        <div class="os-content p-0 overflow-auto max-h-[400px]">
+            <table class="font-mono text-[11px]">
+                <thead><tr><th class="w-24">Date</th><th>Meal Type</th><th class="w-20">Kg</th><th class="w-24">Status</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <!-- WINDOW: Menu Editor -->
+    <div class="os-window absolute top-24 left-1/3 w-[450px] z-50 hidden" id="win-menu-editor">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><i data-lucide="file-spreadsheet" class="w-4 h-4"></i><span class="font-bold text-[10px] uppercase tracking-wider">MENU_EDITOR.cfg</span></div>
+            <div class="window-button bg-secondary" onclick="toggleWindow('win-menu-editor')"></div>
+        </div>
+        <div class="os-content p-4 space-y-3 max-h-[420px] overflow-y-auto">
+            <p class="font-body-md text-xs text-on-surface-variant">Update the weekly canteen menu structure to train the prediction AI.</p>
+            <div class="space-y-2">
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Monday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-mon-type">
+                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
+                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-mon-name" placeholder="Custom dish name..."/>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Tuesday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-tue-type">
+                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
+                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-tue-name" placeholder="Custom dish name..."/>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Wednesday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-wed-type">
+                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
+                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-wed-name" placeholder="Custom dish name..."/>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Thursday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-thu-type">
+                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
+                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-thu-name" placeholder="Custom dish name..."/>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Friday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-fri-type">
+                        <option value="pasta">Pasta</option><option value="salad">Salad</option><option value="pizza">Pizza</option>
+                        <option value="sandwich">Sandwich</option><option value="soup">Soup</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-fri-name" placeholder="Custom dish name..."/>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <span class="font-mono text-xs font-bold uppercase">Saturday:</span>
+                    <select class="pixel-border p-1 text-xs" id="menu-edit-sat-type">
+                        <option value="closed">Closed</option><option value="special">Special</option>
+                    </select>
+                    <input type="text" class="pixel-border p-1 text-xs font-mono" id="menu-edit-sat-name" placeholder="Custom dish name..."/>
+                </div>
+            </div>
+            <button onclick="saveStructuredMenu()" class="w-full bg-primary text-white pixel-border py-1.5 font-label-lg uppercase text-xs hover:bg-primary-container transition-colors mt-2">Save Menu Configuration</button>
+        </div>
+    </div>
+    <!-- WINDOW: AI Logs -->
+    <div class="os-window absolute top-48 left-1/4 w-[600px] z-50 hidden" id="win-ai-logs">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><i data-lucide="brain-circuit" class="w-4 h-4"></i><span class="font-bold text-[10px] uppercase tracking-wider">AI_DECISION_LOGS</span></div>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button onclick="downloadChatLogs()"
+                  style="font-size:9px;font-family:monospace;background:#60a5fa;color:white;border:2px solid #0f172a;padding:1px 6px;cursor:pointer;font-weight:bold;">
+                  ⬇ DOWNLOAD CHATS
+                </button>
+                <div class="window-button bg-secondary" onclick="toggleWindow('win-ai-logs')"></div>
+            </div>
+        </div>
+        <div class="os-content p-0 overflow-auto max-h-[400px]">
+            <table class="font-mono text-[10px]">
+                <thead><tr><th class="w-32">Timestamp</th><th class="w-24">Agent</th><th>Reasoning</th><th class="w-24">Outcome</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <!-- WINDOW: Terminal -->
+    <div class="os-window absolute bottom-32 right-1/4 w-[500px] z-50 hidden" id="win-terminal">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4"></i><span class="font-bold text-[10px] uppercase tracking-wider">SYSTEM_TERMINAL</span></div>
+            <div class="window-button bg-secondary" onclick="toggleWindow('win-terminal')"></div>
+        </div>
+        <div class="os-content p-4 bg-deep-slate-navy text-primary-fixed-dim font-mono text-xs h-[300px] flex flex-col">
+            <div class="flex-1 overflow-y-auto" id="terminal-output"></div>
+            <div class="flex gap-2 mt-2 border-t border-primary/20 pt-2">
+                <span>&gt;</span>
+                <input class="bg-transparent border-none p-0 focus:ring-0 w-full text-xs" placeholder="enter command..." type="text"/>
+            </div>
+        </div>
+    </div>
+    <!-- WINDOW: Simulation Engine -->
+    <div class="os-window absolute inset-12 z-50" id="win-simulation">
+        <div class="os-titlebar">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">monitoring</span><span class="font-bold text-[10px] uppercase tracking-wider">SIM_ENGINE_v4.0</span></div>
+            <div class="window-button bg-secondary" onclick="toggleWindow('win-simulation')"></div>
+        </div>
+        <div class="os-content flex-1 bg-deep-slate-navy p-0 overflow-hidden relative">
+            <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle, #4edea3 1px, transparent 1px); background-size: 30px 30px;"></div>
+            <div class="relative h-full flex flex-col p-8">
+                <div class="flex justify-between items-start mb-8">
+                    <h2 class="text-primary-fixed-dim text-4xl font-mono uppercase">Active Simulation</h2>
+                    <div class="text-right font-mono text-primary-fixed-dim">
+                        <div class="text-xs">UPTIME: 142:12:05</div>
+                        <div class="text-xs">LOAD: 42.8%</div>
+                    </div>
+                </div>
+                <div class="flex-1 border-2 border-primary-fixed-dim/30 rounded p-4 flex items-center justify-center">
+                    <div class="text-primary-fixed-dim font-mono text-center animate-pulse">
+                        <div class="text-6xl mb-4">[ RUNNING ]</div>
+                        <div class="text-sm">NEURAL_BRIDGE_STABLE</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- WINDOW: Prediction Paper -->
+    <div class="os-window absolute top-12 left-1/2 -translate-x-1/2 w-[460px] z-[80] hidden flex flex-col" id="win-prediction-paper">
+        <div class="os-titlebar" style="cursor:move;">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[14px]">description</span>
+                <span class="font-bold text-[10px] uppercase tracking-wider font-mono">FORECAST_REPORT — PRINT_OUT</span>
+            </div>
+            <div class="window-button bg-secondary cursor-pointer" onclick="toggleWindow('win-prediction-paper')"></div>
+        </div>
+        <div class="os-content p-3 bg-slate-100 font-mono text-[11px] flex-grow overflow-y-auto max-h-[500px]" style="box-shadow: inset 0 0 10px rgba(0,0,0,0.05);">
+            <div class="bg-white border-2 border-slate-300 p-4 relative" style="background: linear-gradient(180deg, #fff 0%, #fafafa 100%);">
+                <!-- Tear strip effect top/bottom -->
+                <div class="absolute -top-1 left-0 right-0 h-1 bg-[linear-gradient(45deg,transparent_25%,#fff_25%,#fff_75%,transparent_75%),linear-gradient(-45deg,transparent_25%,#fff_25%,#fff_75%,transparent_75%)] bg-[size:6px_6px]"></div>
+                
+                <!-- Receipt Header -->
+                <div class="text-center border-b border-dashed border-slate-300 pb-2.5 mb-2.5">
+                    <h3 class="text-base font-bold tracking-widest text-slate-800 uppercase font-mono">CMD_CORE OUTLOOK</h3>
+                    <p class="text-[8px] text-slate-500 mt-0.5" id="pred-paper-date">DATE: --/--/---- • --:--</p>
+                    <div class="text-[6px] text-slate-300 mt-1 font-mono tracking-widest leading-none select-none">|||||||| | ||||| ||| | ||||| ||||||| | |||||</div>
+                </div>
+
+                <!-- Live Metrics Summary -->
+                <div class="space-y-2.5">
+                    <!-- Weather Card -->
+                    <div class="border border-slate-200 bg-white p-2 rounded shadow-sm hover:shadow transition-shadow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-700">⛅ ENVIRONMENT</span>
+                            <span id="pred-paper-weather-icon" class="text-base">☁️</span>
+                        </div>
+                        <div id="pred-paper-weather-text" class="text-[10px] text-slate-600">Unknown, --°C</div>
+                        <div class="mt-1.5">
+                            <div class="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                                <span>Weather Impact</span>
+                                <span id="pp-weather-count">0%</span>
+                            </div>
+                            <div class="pp-meter-track">
+                                <div id="pp-weather-bar" class="pp-bar-fill bg-blue-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Event Card -->
+                    <div class="border border-slate-200 bg-white p-2 rounded shadow-sm hover:shadow transition-shadow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-700">📅 ACADEMIC CALENDAR</span>
+                        </div>
+                        <div id="pred-paper-event-name" class="text-[10px] font-bold text-indigo-600">REGULAR DAY</div>
+                        <div id="pred-paper-event-desc" class="text-[9px] text-slate-500 leading-relaxed mt-0.5">Regular cafeteria operations.</div>
+                        <div class="mt-1.5">
+                            <div class="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                                <span>Calendar Impact</span>
+                                <span id="pp-calendar-count">0%</span>
+                            </div>
+                            <div class="pp-meter-track">
+                                <div id="pp-calendar-bar" class="pp-bar-fill bg-indigo-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Menu Risk Card -->
+                    <div class="border border-slate-200 bg-white p-2 rounded shadow-sm hover:shadow transition-shadow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-700">🍽️ MENU PROFILE</span>
+                            <span id="pred-paper-menu-risk" class="px-1.5 py-0.5 rounded text-[8px] font-bold text-white bg-amber-500 uppercase">MEDIUM</span>
+                        </div>
+                        <div id="pred-paper-menu-name" class="text-[10px] font-bold text-slate-800">PASTA</div>
+                        <div class="text-[9px] text-slate-500 mt-0.5">Historical Avg Waste: <span id="pred-paper-menu-hist">~8.4kg</span></div>
+                        <div class="mt-1.5">
+                            <div class="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                                <span>Menu Impact</span>
+                                <span id="pp-menu-count">0%</span>
+                            </div>
+                            <div class="pp-meter-track">
+                                <div id="pp-menu-bar" class="pp-bar-fill bg-amber-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LGBM Baseline Card -->
+                    <div class="border border-slate-200 bg-white p-2 rounded shadow-sm hover:shadow transition-shadow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-700">📊 ML BASELINE MODEL</span>
+                        </div>
+                        <div class="text-[10px] text-slate-600">LightGBM predicted baseline: <span id="pred-paper-ml-val" class="font-bold">-- kg</span></div>
+                        <div class="mt-1.5">
+                            <div class="flex justify-between text-[9px] text-slate-500 mb-0.5">
+                                <span>ML Baseline Weight</span>
+                                <span id="pp-lgbm-count">0%</span>
+                            </div>
+                            <div class="pp-meter-track">
+                                <div id="pp-lgbm-bar" class="pp-bar-fill bg-slate-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Synthesis & Prediction Card -->
+                    <div class="border-2 border-primary/30 bg-emerald-50/50 p-2.5 rounded hover:shadow transition-shadow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-emerald-800">⚡ AI SYNTHESIS RESULT</span>
+                            <span id="pred-paper-ai-val" class="text-xs font-bold text-emerald-700">-- kg</span>
+                        </div>
+                        <p id="pred-paper-explanation" class="text-[9px] text-slate-600 leading-relaxed">AI has synthesized historical ML patterns with live weather forecasts and academic events.</p>
+                        
+                        <div class="mt-2.5">
+                            <div class="flex justify-between text-[9px] text-emerald-800 font-bold mb-0.5">
+                                <span>Waste Risk Probability</span>
+                                <span id="pp-final-count">0%</span>
+                            </div>
+                            <div class="pp-meter-track border-emerald-300 bg-emerald-100/50">
+                                <div id="pp-final-bar" class="pp-bar-fill bg-emerald-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="mt-2 flex items-center gap-1.5 text-[8px] text-emerald-700 font-bold">
+                            <i data-lucide="leaf" class="w-3 h-3 text-emerald-600"></i>
+                            <span id="pred-paper-co2-val">-- kg CO₂ prevents if rescued</span>
+                        </div>
+                    </div>
+
+                    <!-- Rescue Dispatch Preview Card -->
+                    <div class="border border-dashed border-slate-300 p-2 bg-slate-50/50 rounded font-mono text-[8px]">
+                        <div class="font-bold text-slate-500 mb-1">LOGISTICS DISPATCH PREVIEW</div>
+                        <pre id="pred-paper-dispatch-preview" class="whitespace-pre-wrap text-slate-600 leading-normal font-mono bg-white p-1.5 border border-slate-200 rounded"></pre>
+                    </div>
+                </div>
+
+                <!-- Receipt Footer Actions -->
+                <div class="mt-4 pt-3 border-t border-dashed border-slate-300 text-center">
+                    <button id="pred-paper-approve-btn" onclick="approvePredictionPaper()" class="w-full bg-primary text-white border-2 border-deep-slate-navy font-bold py-2 px-4 rounded shadow-[3px_3px_0px_0px_#0f172a] hover:translate-y-[-1px] active:translate-y-[2px] transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5">
+                        ✅ Approve Forecast & Prepare Dispatch
+                    </button>
+                    <button onclick="toggleWindow('win-prediction-paper')" class="w-full mt-2 bg-slate-200 text-slate-700 border-2 border-slate-400 font-bold py-1 px-4 rounded text-[10px] hover:bg-slate-300 transition-colors uppercase">
+                        Dismiss Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WINDOW: Chat AI (CMD_CORE) — Premium Edition -->
+    <div id="win-chat" class="os-window" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:640px;max-height:82vh;z-index:60;display:none;flex-direction:column;">
+      <div class="os-titlebar" style="cursor:move;" id="win-chat-titlebar">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:6px;display:flex;align-items:center;justify-content:center;border:2px solid #0f172a;">
+            <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:900;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#0f172a;">CMD_CORE  //  AI Assistant</div>
+            <div style="font-size:9px;color:#64748b;font-family:monospace;" id="chat-model-badge">Claude 3.5 Sonnet · Ready</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button onclick="downloadChatPDF()" title="Export PDF" style="background:#f1f5f9;border:2px solid #0f172a;color:#0f172a;font-family:monospace;font-size:9px;padding:2px 8px;cursor:pointer;font-weight:700;text-transform:uppercase;border-radius:3px;" class="hover:bg-primary hover:text-white transition-colors">⬇ PDF</button>
+          <button onclick="downloadChatLogs()" title="Export TXT" style="background:#f1f5f9;border:2px solid #0f172a;color:#0f172a;font-family:monospace;font-size:9px;padding:2px 8px;cursor:pointer;font-weight:700;text-transform:uppercase;border-radius:3px;" class="hover:bg-primary hover:text-white transition-colors">⬇ TXT</button>
+          <button onclick="clearChat()" title="Clear chat" style="background:#fef2f2;border:2px solid #ef4444;color:#ef4444;font-family:monospace;font-size:9px;padding:2px 8px;cursor:pointer;font-weight:700;text-transform:uppercase;border-radius:3px;">✕ CLEAR</button>
+          <div class="window-button bg-secondary" onclick="toggleWindow('win-chat')" style="margin-left:4px;"></div>
+        </div>
+      </div>
+
+      <!-- Quick Actions Bar -->
+      <div id="chat-quick-actions" style="background:#f8fafc;border-bottom:2px solid #e2e8f0;padding:8px 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:9px;font-family:monospace;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-right:4px;">Quick:</span>
+        <button onclick="chatQuickAction('Run AI forecast for today')" class="chat-pill-btn">🔮 Forecast</button>
+        <button onclick="chatQuickAction('Generate and download a PDF report of today')" class="chat-pill-btn">📄 PDF Report</button>
+        <button onclick="chatQuickAction('Export all waste data as CSV')" class="chat-pill-btn">📊 Export CSV</button>
+        <button onclick="chatQuickAction('What is the current waste level and risk?')" class="chat-pill-btn">⚠️ Status</button>
+        <button onclick="chatQuickAction('Suggest menu optimizations for this week')" class="chat-pill-btn">🍽️ Menu Tips</button>
+        <button onclick="chatQuickAction('Summarize today operations in a daily report')" class="chat-pill-btn">📋 Summary</button>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;background:#f8fafc;min-height:0;max-height:calc(82vh - 200px);font-size:13px;line-height:1.6;"></div>
+
+      <!-- Typing Indicator -->
+      <div id="chat-typing" style="display:none;padding:8px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:24px;height:24px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+            <span style="font-size:10px;">✦</span>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <div class="chat-dot"></div><div class="chat-dot" style="animation-delay:0.15s"></div><div class="chat-dot" style="animation-delay:0.3s"></div>
+            <span style="font-size:10px;color:#94a3b8;font-family:monospace;margin-left:4px;" id="chat-typing-label">CMD_CORE is thinking...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div style="background:white;border-top:3px solid #0f172a;padding:12px;">
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <div style="flex:1;position:relative;">
+            <textarea id="chat-input" rows="1" placeholder="Ask CMD_CORE anything — forecasts, PDF reports, data exports, menu advice..." onkeydown="chatInputKeydown(event)" oninput="autoGrowChat(this)" style="width:100%;resize:none;border:2px solid #e2e8f0;border-radius:8px;padding:10px 40px 10px 12px;font-size:13px;font-family:inherit;outline:none;background:#f8fafc;line-height:1.5;max-height:120px;overflow-y:auto;transition:border-color 0.2s;box-sizing:border-box;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+            <div style="position:absolute;right:10px;bottom:10px;font-size:10px;color:#94a3b8;font-family:monospace;">↵</div>
+          </div>
+          <button onclick="sendChatMessage()" id="chat-send-btn" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:2px solid #0f172a;border-radius:8px;width:42px;height:42px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.1s,box-shadow 0.1s;box-shadow:3px 3px 0 #0f172a;" onmousedown="this.style.transform='scale(0.95)';this.style.boxShadow='1px 1px 0 #0f172a'" onmouseup="this.style.transform='scale(1)';this.style.boxShadow='3px 3px 0 #0f172a'">
+            <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;">
+          <span style="font-size:9px;color:#94a3b8;font-family:monospace;">CMD_CORE can generate PDFs, exports, forecasts, summaries, and more.</span>
+          <span style="font-size:9px;color:#94a3b8;font-family:monospace;" id="chat-char-count">0 / 2000</span>
+        </div>
+      </div>
+    </div>
+
+    <style>
+    #win-chat { display:none; }
+    #win-chat.chat-open { display:flex !important; }
+    #win-simulation { display:none; }
+    #win-simulation:not(.hidden) { display:flex; flex-direction:column; }
+    /* Absolute safety: taskbar, folders always visible */
+    #desktop-os .taskbar,
+    #desktop-os .folder-item {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+        display: flex !important;
+    }
+    .chat-pill-btn {
+      background: white;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 10px;
+      font-family: inherit;
+      cursor: pointer;
+      color: #374151;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .chat-pill-btn:hover {
+      background: #6366f1;
+      color: white;
+      border-color: #6366f1;
+      transform: translateY(-1px);
+    }
+    .chat-dot {
+      width: 6px; height: 6px;
+      background: #6366f1;
+      border-radius: 50%;
+      animation: chatDotPulse 1s ease-in-out infinite;
+    }
+    @keyframes chatDotPulse {
+      0%,80%,100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    .chat-msg-user { display:flex; gap:10px; align-items:flex-start; flex-direction:row-reverse; }
+    .chat-msg-ai   { display:flex; gap:10px; align-items:flex-start; }
+    .chat-bubble-user {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border-radius: 16px 16px 4px 16px;
+      padding: 10px 14px;
+      max-width: 80%;
+      font-size: 13px;
+      line-height: 1.5;
+      border: 2px solid #0f172a;
+      box-shadow: 2px 2px 0 #0f172a;
+    }
+    .chat-bubble-ai {
+      background: white;
+      color: #0f172a;
+      border-radius: 16px 16px 16px 4px;
+      padding: 12px 14px;
+      max-width: 82%;
+      font-size: 13px;
+      line-height: 1.6;
+      border: 2px solid #0f172a;
+      box-shadow: 2px 2px 0 #0f172a;
+    }
+    .chat-avatar-user {
+      width:28px;height:28px;
+      background:linear-gradient(135deg,#10b981,#059669);
+      border-radius:50%;
+      border:2px solid #0f172a;
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;font-size:12px;
+    }
+    .chat-avatar-ai {
+      width:28px;height:28px;
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      border-radius:50%;
+      border:2px solid #0f172a;
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;font-size:12px;
+    }
+    .chat-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px; opacity:0.7; font-family:monospace; }
+    .chat-bubble-ai table { border-collapse:collapse; width:100%; margin:8px 0; font-size:11px; }
+    .chat-bubble-ai th { background:#0f172a; color:white; padding:4px 8px; text-align:left; font-family:monospace; font-size:10px; }
+    .chat-bubble-ai td { border:1px solid #e2e8f0; padding:4px 8px; font-family:monospace; font-size:11px; }
+    .chat-bubble-ai tr:nth-child(even) td { background:#f8fafc; }
+    .chat-bubble-ai code { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:3px; padding:1px 4px; font-family:monospace; font-size:11px; }
+    .chat-bubble-ai pre { background:#0f172a; color:#e2e8f0; border-radius:6px; padding:10px; font-family:monospace; font-size:11px; overflow-x:auto; margin:6px 0; }
+    .chat-action-row { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+    .chat-action-btn { background:#f1f5f9; border:1.5px solid #cbd5e1; border-radius:6px; padding:4px 10px; font-size:10px; font-family:monospace; cursor:pointer; transition:all 0.15s; font-weight:700; }
+    .chat-action-btn:hover { background:#6366f1; color:white; border-color:#6366f1; }
+    </style>
+    <!-- FOLDER GRID (Bottom Left) -->
+    <div class="absolute bottom-16 left-6 flex gap-8" style="z-index:110;">
+        <div class="folder-item group" onclick="toggleWindow('win-ai-logs')">
+            <div class="relative">
+                <svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                <i data-lucide="brain-circuit" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
+            </div>
+            <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">AI_LOGS</span>
+        </div>
+        <div class="folder-item" onclick="toggleWindow('win-waste-logs')">
+            <div class="relative">
+                <svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                <i data-lucide="file-spreadsheet" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
+            </div>
+            <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">WASTE_LOGS</span>
+        </div>
+        <div class="folder-item" onclick="toggleWindow('win-weather')">
+            <div class="relative">
+                <svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                <i data-lucide="cloud-sun" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
+            </div>
+            <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">WEATHER</span>
+        </div>
+        <div class="folder-item" onclick="openMenuEditor()">
+            <div class="relative">
+                <svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                <i data-lucide="file-spreadsheet" class="absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40"></i>
+            </div>
+            <span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">MENU_CFG</span>
+        </div>
+    </div>
+    <!-- TASKBAR / DOCK -->
+    <nav class="taskbar fixed bottom-0 left-0 w-full flex items-center px-4 justify-between">
+        <div class="flex items-center gap-4 h-full">
+            <button class="bg-deep-slate-navy text-white px-4 h-8 flex items-center gap-2 font-bold text-xs uppercase border-2 border-white shadow-[2px_2px_0px_0px_#0f172a] rounded-md hover:bg-primary transition-all">
+                <div class="w-3 h-3 bg-primary-fixed-dim rounded-sm"></div>
+                System
+            </button>
+            <div class="h-6 w-px bg-deep-slate-navy opacity-20"></div>
+            <div class="flex gap-2">
+                <div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center justify-center" onclick="toggleWindow('win-terminal')" title="Terminal">
+                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                </div>
+                <div class="w-8 h-8 border-2 border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-500 hover:to-purple-500 hover:text-white transition-all cursor-pointer flex items-center justify-center shadow-[2px_2px_0px_0px_#6366f1]" onclick="toggleWindow('win-chat')" title="CMD_CORE — AI Assistant" id="dock-chat-btn">
+                    <i data-lucide="brain-circuit" class="w-4 h-4 text-indigo-600 group-hover:text-white"></i>
+                </div>
+                <div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center justify-center" onclick="openApiSettings()" title="API Configuration">
+                    <i data-lucide="key" class="w-4 h-4"></i>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="hidden md:flex items-center gap-2 text-[10px] font-mono font-bold uppercase">
+                <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                ACTIVE_RESCUE_RADAR
+            </div>
+            <div class="flex flex-col items-end leading-none cursor-pointer hover:bg-surface-container-low px-2 py-1 rounded transition-colors border-l border-deep-slate-navy/10 pl-4" onclick="toggleWindow('win-calendar')">
+                <span class="text-xs font-bold font-mono" id="taskbar-time">Loading...</span>
+                <span class="text-[8px] font-bold opacity-50 uppercase tracking-tighter" id="taskbar-date"></span>
+            </div>
+        </div>
+    </nav>
+</div>
+
+<!-- Toast overlay for transition messages -->
+<div class="fixed bottom-6 right-6 z-[200] hidden" id="global-toast">
+    <div class="bg-primary text-white pixel-border tactile-shadow p-4 flex items-center gap-3">
+        <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        <div>
+            <p class="font-bold uppercase" id="toast-title">Loading</p>
+            <p class="text-sm opacity-90" id="toast-message">Please wait...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // NAVIGATION — Wire the 3 sections together
+    // ============================================================
+
+    // Global config object — populated by setup wizard, used by AI agents
+    const setupConfig = {
+        canteenName: '',
+        location: '',
+        calendarEvent: '',
+        efficiencyGoal: '',
+        avgStudents: 0,
+        staffCount: 0,
+        weeklyMenu: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '' },
+        managerName: '',
+        managerContact: '',
+        shelterName: '',
+        cafeteriaPhoto: null,
+        googleUser: null
+    };
+
+    function showSetupWizard() {
+        const gate = document.getElementById('welcome-gate');
+        const wizard = document.getElementById('setup-wizard');
+        const cards = document.getElementById('classic-wizard-cards');
+
+        if (typeof gsap !== 'undefined') {
+            const tl = gsap.timeline({
+                onComplete: () => {
+                    gate.classList.add('hidden');
+                    if (wizard) {
+                        wizard.classList.remove('hidden');
+                        if (cards) cards.classList.remove('hidden');
+                        
+                        // GSAP setup wizard panel entrance (scale/fade-in)
+                        gsap.fromTo('#setup-wizard', 
+                            { opacity: 0, scale: 0.95 }, 
+                            { opacity: 1, scale: 1, duration: 0.6, ease: 'back.out(1.2)' }
+                        );
+                        // Optional: cascade float of the side images
+                        gsap.from('#setup-wizard .pixel-float', {
+                            opacity: 0,
+                            y: 50,
+                            stagger: 0.2,
+                            duration: 0.8,
+                            ease: 'power3.out'
+                        });
+                        // Stagger stack-cards load
+                        gsap.from('#classic-wizard-cards', {
+                            opacity: 0,
+                            y: 30,
+                            duration: 0.8,
+                            ease: 'power3.out',
+                            delay: 0.2
+                        });
+                    }
+                }
+            });
+            
+            tl.to(gate, {
+                opacity: 0,
+                scale: 1.05,
+                y: -30,
+                duration: 0.6,
+                ease: 'power3.in'
+            });
+        } else {
+            gate.style.transition = 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+            gate.style.opacity = '0';
+            gate.style.transform = 'scale(1.05) translateY(-20px)';
+            gate.style.pointerEvents = 'none';
+            setTimeout(() => {
+                gate.classList.add('hidden');
+                if (wizard) {
+                    wizard.classList.remove('hidden');
+                    if (cards) cards.classList.remove('hidden');
+                }
+            }, 600);
+        }
+    }
+
+    function finishSetup() {
+        const errEl = document.getElementById('card-4-error') || (()=>{const e=document.createElement('p');e.id='card-4-error';e.style.cssText='color:#ef4444;font-size:12px;font-weight:bold;margin-top:8px;text-align:center;';const c4=document.querySelector('#card-4 .flex-grow');if(c4)c4.appendChild(e);return e;})();
+        const name = (document.getElementById('input-manager')?.value || '').trim();
+        const contact = (document.getElementById('input-contact')?.value || '').trim();
+        const shelter = (document.getElementById('input-shelter')?.value || '').trim();
+        const photoInput = document.getElementById('input-photo');
+        const hasPhoto = photoInput && photoInput.files && photoInput.files.length > 0;
+        if (!name || !contact || !shelter || !hasPhoto) {
+            if (errEl) errEl.textContent = '⚠️ Fill all contact fields and upload a cafeteria photo before launching.';
+            return;
+        }
+
+        setupConfig.canteenName = document.getElementById('input-canteen').value.trim();
+        setupConfig.location = document.getElementById('input-location').value.trim();
+        setupConfig.calendarEvent = 'normal'; // calendar event is dynamically checked
+        setupConfig.efficiencyGoal = document.getElementById('input-efficiency').value;
+        setupConfig.avgStudents = parseInt(document.getElementById('input-students').value) || 0;
+        setupConfig.staffCount = parseInt(document.getElementById('input-staff').value) || 0;
+        setupConfig.openTime = document.getElementById('input-open').value || '07:00';
+        setupConfig.closeTime = document.getElementById('input-close').value || '15:00';
+        setupConfig.weeklyMenu.mon = document.getElementById('input-mon').value;
+        setupConfig.weeklyMenu.tue = document.getElementById('input-tue').value;
+        setupConfig.weeklyMenu.wed = document.getElementById('input-wed').value;
+        setupConfig.weeklyMenu.thu = document.getElementById('input-thu').value;
+        setupConfig.weeklyMenu.fri = document.getElementById('input-fri').value;
+        setupConfig.weeklyMenu.sat = document.getElementById('input-sat').value;
+        
+        setupConfig.managerName = name;
+        setupConfig.managerContact = contact;
+        setupConfig.shelterName = shelter;
+        setupConfig.cafeteriaPhoto = photoInput.files[0];
+
+        console.log('[Setup] Config saved:', setupConfig);
+
+        // Hide wizard, show AI intro chat
+        const wizard = document.getElementById('setup-wizard');
+        if (wizard) wizard.classList.add('hidden');
+        const introCard = document.getElementById('ai-intro-card');
+        introCard.classList.remove('hidden');
+        introCard.style.animation = 'fadeIn 0.4s ease';
+
+        // Start AI intro conversation
+        startAiIntro();
+    }
+
+    let mapGeneratedB64 = null;
+
+    function updateLoadingBar(pct, label, duration = 0.5) {
+        const bar = document.getElementById('loading-bar');
+        const status = document.getElementById('loading-status');
+        if (status && label) status.textContent = label;
+        if (bar && typeof gsap !== 'undefined') {
+            gsap.to(bar, { width: pct + '%', duration: duration, ease: "power2.out" });
+        } else if (bar) {
+            bar.style.width = pct + '%';
+        }
+    }
+
+    async function generateMapOnLoad() {
+        const status = document.getElementById('loading-status');
+        const bar = document.getElementById('loading-bar');
+        const stage1 = document.getElementById('loading-stage-1');
+        const stage2 = document.getElementById('loading-stage-2');
+
+        try {
+            updateLoadingBar(40, GEMINI_API_KEY ? 'Connecting to Gemini AI...' : 'Generating procedural cafeteria map...', 0.6);
+
+            if(setupConfig.cafeteriaPhoto && !uploadedPhotoB64) {
+                uploadedPhotoB64 = await fileToBase64(setupConfig.cafeteriaPhoto);
+            }
+
+            updateLoadingBar(60, 'Generating pixel-art cafeteria map...', 0.8);
+
+            // generateCafeteriaImage always returns a valid image (procedural fallback on any error)
+            mapGeneratedB64 = await generateCafeteriaImage(uploadedPhotoB64);
+
+            updateLoadingBar(80, 'AI analyzing layout zones...', 0.6);
+
+            currentMapConfig = await runAgent1(mapGeneratedB64);
+
+            updateLoadingBar(100, 'Map ready!', 0.4);
+
+            // Show the generated map
+            const img = document.getElementById('map-preview-img');
+            img.src = mapGeneratedB64;
+            img.classList.remove('hidden');
+            document.getElementById('map-preview-placeholder').classList.add('hidden');
+
+            stage1.classList.add('hidden');
+            stage2.classList.remove('hidden');
+
+            // Pre-load for desktop
+            setCanvasBackground(mapGeneratedB64);
+            applyZones(currentMapConfig);
+
+        } catch(e) {
+            if (status) status.textContent = '⚠️ ' + e.message;
+            if (bar && typeof gsap !== 'undefined') {
+                gsap.to(bar, { width: '100%', duration: 0.3 });
+                bar.style.background = '#ef4444';
+            } else if (bar) {
+                bar.style.width = '100%';
+                bar.style.background = '#ef4444';
+            }
+            setTimeout(() => {
+                stage1.classList.add('hidden');
+                stage2.classList.remove('hidden');
+                document.getElementById('map-preview-placeholder').textContent = '⚠️ Map error. You can retry from the desktop.';
+            }, 2000);
+        }
+    }
+
+
+    function completeLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.add('hidden');
+        const desktop = document.getElementById('desktop-os');
+        desktop.classList.remove('hidden');
+        desktop.style.animation = 'fadeIn 0.6s ease';
+        // Wait for browser to paint the desktop before firing GSAP boot animations
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if(window.__bootDesktop) window.__bootDesktop();
+            });
+        });
+    }
+
+    async function generateMapAgain() {
+        const stage2 = document.getElementById('loading-stage-2');
+        stage2.classList.add('hidden');
+        document.getElementById('loading-stage-1').classList.remove('hidden');
+        document.getElementById('loading-bar').style.width = '30%';
+        document.getElementById('loading-bar').style.background = '';
+        document.getElementById('loading-bar').classList.add('animate-pulse');
+        await generateMapOnLoad();
+    }
+
+    // ============================================================
+    // AI INTRO CHAT (post-wizard, pre-loading)
+    // ============================================================
+
+    let aiIntroStep = 0;
+    let aiIntroHistory = [];
+
+    function buildAiIntroContext() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        return `You are the CanteenTycoon setup assistant. Today is ${dateStr} and the current time is ${timeStr}.
+Your job is to:
+1. Greet the manager warmly and introduce yourself — always reference TODAY'S DATE naturally
+2. Ask clarifying questions about their cafeteria based on what they've already entered
+3. Explain how CanteenTycoon works: AI agents analyze food waste patterns, predict waste, suggest order reductions, and coordinate food rescue with local shelters
+4. After explaining, ask if they're ready to proceed to the map generation
+
+Already known about this cafeteria:
+- Canteen name: ${setupConfig?.canteenName || 'Unknown'}
+- Location: ${setupConfig?.location || 'Unknown'}
+- Students/day: ${setupConfig?.avgStudents || '?'}
+- Staff: ${setupConfig?.staffCount || '?'}
+- Weekly menu: ${Object.values(setupConfig?.weeklyMenu || {}).filter(Boolean).join(', ') || 'Not specified'}
+- Calendar event: ${setupConfig?.calendarEvent || 'normal'}
+- Efficiency goal: ${setupConfig?.efficiencyGoal || '80%'}
+- Manager: ${setupConfig?.managerName || 'Unknown'}
+- Contact: ${setupConfig?.managerContact || 'Unknown'}
+- Shelter: ${setupConfig?.shelterName || 'Unknown'}
+
+Conversation rules:
+- NEVER use prewritten or generic greetings. Always reference the actual date, location, and canteen name.
+- Keep responses under 100 words
+- Ask ONE question at a time
+- Be warm, professional, and excited about reducing food waste
+- After 2-3 exchanges, explain how CanteenTycoon works
+- Then ask: "Are you ready to proceed? Type 'yes' to start generating your cafeteria map!"
+- If user says yes, respond with exactly: "READY_TO_PROCEED"
+- If user asks questions, answer them helpfully`;
+    }
+
+    async function startAiIntro() {
+        aiIntroStep = 0;
+        aiIntroHistory = [];
+        const aiMsgContainer = document.getElementById('ai-intro-messages');
+        aiMsgContainer.innerHTML = '';
+        try {
+            const system = buildAiIntroContext();
+            const res = await fetch(NIM_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${NVIDIA_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: NIM_MODEL,
+                    messages: [
+                        { role: 'system', content: system },
+                        { role: 'user', content: 'Hello! I just finished setting up my cafeteria. Introduce yourself and tell me what you think about my setup.' }
+                    ],
+                    temperature: 0.4,
+                    max_tokens: 300
+                })
+            });
+            if (!res.ok) throw new Error(`NIM ${res.status}`);
+            const reply = (await res.json()).choices[0].message.content;
+            aiIntroHistory.push({ role: 'assistant', content: reply });
+            appendAiIntroMessage('assistant', reply);
+            aiIntroStep = 1;
+            if (reply.includes('READY_TO_PROCEED')) {
+                proceedFromAiIntro();
+            }
+        } catch (err) {
+            const fallbackDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            appendAiIntroMessage('assistant', `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}! It's ${fallbackDate}. I'm your CanteenTycoon setup assistant. I see you've configured your cafeteria at ${setupConfig?.location || 'your location'} with ${setupConfig?.avgStudents || 'many'} students. 
+
+I help reduce food waste by analyzing patterns and predicting waste before it happens. 
+
+Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
+            aiIntroStep = 1;
+        }
+    }
+
+    async function sendAiIntroMessage() {
+        const input = document.getElementById('ai-intro-input');
+        const msg = input.value.trim();
+        if (!msg) return;
+        input.value = '';
+        appendAiIntroMessage('user', msg);
+        aiIntroHistory.push({ role: 'user', content: msg });
+
+        if (msg.toLowerCase() === 'yes' || msg.toLowerCase() === 'yep' || msg.toLowerCase() === 'ready' || msg.toLowerCase() === 'let\'s go' || msg.toLowerCase() === "let's go" || msg.toLowerCase() === 'proceed') {
+            appendAiIntroMessage('assistant', 'READY_TO_PROCEED');
+            proceedFromAiIntro();
+            return;
+        }
+
+        try {
+            const system = buildAiIntroContext();
+            const res = await fetch(NIM_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${NVIDIA_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: NIM_MODEL,
+                    messages: [
+                        { role: 'system', content: system },
+                        ...aiIntroHistory.slice(-10)
+                    ],
+                    temperature: 0.4,
+                    max_tokens: 300
+                })
+            });
+            if (!res.ok) throw new Error(`NIM ${res.status}`);
+            const reply = (await res.json()).choices[0].message.content;
+            aiIntroHistory.push({ role: 'assistant', content: reply });
+            appendAiIntroMessage('assistant', reply);
+            if (reply.includes('READY_TO_PROCEED')) {
+                proceedFromAiIntro();
+            }
+        } catch (err) {
+            const fallbackDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            appendAiIntroMessage('assistant', `As of ${fallbackDate}, here's what I know: CanteenTycoon uses AI agents to monitor your cafeteria — Agent 1 generates a pixel-art map from your photo, Agent 2 predicts food waste, and Agent 3 coordinates rescues with shelters. Are you ready to proceed? Type "yes" to start!`);
+        }
+    }
+
+    function appendAiIntroMessage(role, text) {
+        const container = document.getElementById('ai-intro-messages');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = 'flex items-start gap-3';
+        if (role === 'user') {
+            div.innerHTML = `
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-white font-bold text-sm">You</span>
+                </div>
+                <div class="bg-primary-container/20 p-4 border-2 border-primary flex-1">
+                    <p class="font-bold text-[10px] uppercase text-primary mb-2">Manager</p>
+                    <p class="text-sm">${escapeHtml(text)}</p>
+                </div>
+                <div class="w-8 h-8 flex-shrink-0"></div>`;
+        } else {
+            div.innerHTML = `
+                <div class="w-8 h-8 bg-deep-slate-navy rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-white font-bold text-sm">AI</span>
+                </div>
+                <div class="bg-white p-4 border-2 border-deep-slate-navy flex-1">
+                    <p class="font-bold text-[10px] uppercase text-primary mb-2">CanteenTycoon AI</p>
+                    <p class="text-sm">${escapeHtml(text)}</p>
+                </div>
+                <div class="w-8 h-8 flex-shrink-0"></div>`;
+        }
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function proceedFromAiIntro() {
+        document.getElementById('ai-intro-card').classList.add('hidden');
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.remove('hidden');
+        if (typeof gsap !== 'undefined') {
+            gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.4 });
+            // Start scanning grid animation
+            gsap.killTweensOf('#scanner-line-el');
+            gsap.fromTo('#scanner-line-el', 
+                { top: '0%' }, 
+                { top: '96%', duration: 1.5, repeat: -1, yoyo: true, ease: 'sine.inOut' }
+            );
+        } else {
+            overlay.style.animation = 'fadeIn 0.4s ease';
+        }
+        generateMapOnLoad();
+    }
+
+    // ============================================================
+    // API CONFIGURATION SETTINGS
+    // ============================================================
+
+    function openApiSettings() {
+        // Pre-populate keys
+        document.getElementById('input-api-gemini').value = GEMINI_API_KEY || '';
+        document.getElementById('input-api-claude').value = CLAUDE_API_KEY || '';
+        document.getElementById('input-api-google').value = localStorage.getItem('ct_google_client_id') || '';
+        document.getElementById('api-settings-modal').classList.remove('hidden');
+    }
+
+    function closeApiSettings() {
+        document.getElementById('api-settings-modal').classList.add('hidden');
+    }
+
+    function saveApiSettings() {
+        const geminiVal = document.getElementById('input-api-gemini').value.trim();
+        const claudeVal = document.getElementById('input-api-claude').value.trim();
+        const googleVal = document.getElementById('input-api-google').value.trim();
+
+        // Save to localStorage
+        localStorage.setItem('ct_gemini_key', geminiVal);
+        localStorage.setItem('ct_claude_key', claudeVal);
+        localStorage.setItem('ct_google_client_id', googleVal);
+
+        // Update global variables
+        GEMINI_API_KEY = geminiVal;
+        CLAUDE_API_KEY = claudeVal;
+        window.GEMINI_API_KEY = geminiVal;
+        window.CLAUDE_API_KEY = claudeVal;
+
+        closeApiSettings();
+        initGoogleSignIn();
+
+        // Show toast
+        const toast = document.getElementById('global-toast');
+        if(toast) {
+            document.getElementById('toast-title').textContent = '🔑 Configuration Saved';
+            document.getElementById('toast-message').textContent = 'API keys updated. Claude is now active.';
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+    }
+
+    // ============================================================
+    // GOOGLE SIGN-IN
+    // ============================================================
+
+    function handleGoogleCredential(response) {
+        try {
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            setupConfig.googleUser = payload;
+            document.getElementById('gsi-status').classList.remove('hidden');
+            document.getElementById('gsi-email').textContent = payload.email;
+            document.getElementById('gsi-button-wrapper').innerHTML = '<span style="color:#10b981;font-weight:bold;font-size:13px;">✅ Connected</span>';
+            document.getElementById('gsi-error').classList.add('hidden');
+            console.log('[Google] Signed in as', payload.email);
+            
+            // Show the Google Sync button in calendar
+            const syncBtn = document.getElementById('calendar-google-sync');
+            if (syncBtn) syncBtn.classList.remove('hidden');
+            
+            // Auto-fetch events on sign-in
+            setTimeout(() => {
+                if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar();
+            }, 1000);
+        } catch(e) {
+            console.warn('[Google] Token parse failed', e);
+        }
+    }
+
+    let _gsiInitialized = false;
+
+    function initGoogleSignIn() {
+        const wrapper = document.getElementById('gsi-button-wrapper');
+        const gsiContainer = document.getElementById('gsi-container');
+        if(!wrapper || !gsiContainer) return;
+        const clientId = localStorage.getItem('ct_google_client_id') || window.__ENV?.GOOGLE_CLIENT_ID || '';
+        if(!clientId) {
+            gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
+            _gsiInitialized = false;
+            return;
+        }
+
+        if(_gsiInitialized && typeof google !== 'undefined' && google.accounts) {
+            google.accounts.id.cancel();
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleGoogleCredential,
+                cancel_on_tap_outside: false
+            });
+            google.accounts.id.renderButton(wrapper, { theme:'outline', size:'large', type:'standard', shape:'rectangular', width:220 });
+            return;
+        }
+
+        const check = setInterval(() => {
+            if(typeof google !== 'undefined' && google.accounts) {
+                clearInterval(check);
+                _gsiInitialized = true;
+                google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleGoogleCredential,
+                    cancel_on_tap_outside: false
+                });
+                google.accounts.id.renderButton(wrapper, { theme:'outline', size:'large', type:'standard', shape:'rectangular', width:220 });
+            }
+        }, 200);
+    }
+
+    // Run on page load
+    setTimeout(initGoogleSignIn, 500);
+
+    // ============================================================
+    // FOLDER 3 JS — Welcome Gate (kept for reference)
+    // ============================================================
+
+    function initializeWorld() {
+        // Now handled by showSetupWizard()
+        showSetupWizard();
+    }
+
+    function setMode(mode) {
+        console.log('Simulation mode changed:', mode);
+    }
+
+    function triggerAgent1() {
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    // confirmRescue() is defined in js/agents.js — do not redefine here
+
+    function initCanvasPlaceholder() {
+        const canvas = document.getElementById('gameCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        function draw() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f1f5f9';
+            const step = 40;
+            for(let x = 0; x < canvas.width; x += step) {
+                for(let y = 0; y < canvas.height; y += step) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            const time = Date.now() * 0.002;
+            for(let i=0; i<12; i++) {
+                const x = (Math.sin(time + i) * 150) + (canvas.width/2);
+                const y = (Math.cos(time * 0.7 + i) * 120) + (canvas.height/2);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.05)';
+                ctx.fillRect(Math.floor(x/4)*4 + 4, Math.floor(y/4)*4 + 4, 16, 16);
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(Math.floor(x/4)*4, Math.floor(y/4)*4, 16, 16);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(Math.floor(x/4)*4 + 4, Math.floor(y/4)*4 + 4, 4, 4);
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(Math.floor(x/4)*4, Math.floor(y/4)*4, 16, 16);
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+    }
+
+    // ============================================================
+    // FOLDER 2 JS — Setup Wizard
+    // ============================================================
+
+    let currentStep = 1;
+
+    function nextStep(step) {
+        // Validate required fields before allowing advance
+        const errId = `card-${step}-error`;
+        const oldErr = document.getElementById(errId);
+        if(oldErr) oldErr.remove();
+
+        if(step === 1) {
+            const cn = document.getElementById('input-canteen').value.trim();
+            const loc = document.getElementById('input-location').value.trim();
+            if(!cn || !loc) {
+                showFieldError(step, '⚠️ Fill in Canteen Name and Location before proceeding.');
+                return;
+            }
+        }
+        if(step === 2) {
+            const st = parseInt(document.getElementById('input-students').value);
+            const sf = document.getElementById('input-staff').value.trim();
+            if(!st || st < 100 || !sf) {
+                showFieldError(step, '⚠️ Set student count (min 100) and enter staff number.');
+                return;
+            }
+        }
+        if(step === 3) {
+            const days = ['mon','tue','wed','thu','fri','sat'];
+            const allFilled = days.every(d => document.getElementById(`input-${d}`).value);
+            if(!allFilled) {
+                showFieldError(step, '⚠️ Select a meal for every day of the week.');
+                return;
+            }
+        }
+
+        const card = document.getElementById(`card-${step}`);
+        card.classList.add('exit');
+        currentStep++;
+        updateProgress();
+        updateStackVisuals();
+    }
+
+    function showFieldError(step, msg) {
+        const card = document.getElementById(`card-${step}`);
+        const err = document.createElement('p');
+        err.id = `card-${step}-error`;
+        err.style.cssText = 'color:#ef4444;font-size:12px;font-weight:bold;margin-top:8px;text-align:center;';
+        err.textContent = msg;
+        card.querySelector('.flex-grow').appendChild(err);
+    }
+
+    function prevStep(step) {
+        currentStep = step;
+        const card = document.getElementById(`card-${step}`);
+        card.classList.remove('exit');
+        updateProgress();
+        updateStackVisuals();
+    }
+
+    function updateProgress() {
+        for (let i = 1; i <= 4; i++) {
+            const indicator = document.getElementById(`step-${i}-indicator`);
+            if (i <= currentStep) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        }
+    }
+
+    function updateStackVisuals() {
+        const cards = [
+            document.getElementById('card-1'),
+            document.getElementById('card-2'),
+            document.getElementById('card-3'),
+            document.getElementById('card-4')
+        ];
+
+        cards.forEach((card, idx) => {
+            const stepNum = idx + 1;
+            if (!card) return;
+
+            if (stepNum < currentStep) {
+                // Exit card - slide out to the left and rotate slightly
+                if (typeof gsap !== 'undefined') {
+                    gsap.to(card, {
+                        xPercent: -150,
+                        yPercent: -20,
+                        rotation: -15,
+                        opacity: 0,
+                        duration: 0.6,
+                        ease: 'power3.inOut',
+                        pointerEvents: 'none'
+                    });
+                } else {
+                    card.classList.add('exit');
+                }
+                card.style.zIndex = 10;
+            } else if (stepNum === currentStep) {
+                // Current active card
+                if (typeof gsap !== 'undefined') {
+                    gsap.to(card, {
+                        xPercent: 0,
+                        yPercent: 0,
+                        rotation: 0,
+                        scale: 1,
+                        y: 0,
+                        opacity: 1,
+                        duration: 0.6,
+                        ease: 'back.out(1.2)',
+                        pointerEvents: 'auto'
+                    });
+                } else {
+                    card.classList.remove('exit');
+                    card.classList.add('scale-100', 'translate-y-0', 'opacity-100');
+                    card.classList.remove('scale-[0.95]', 'translate-y-4', 'opacity-75', 'scale-[0.9]', 'translate-y-8', 'opacity-50');
+                }
+                card.style.zIndex = 30;
+            } else if (stepNum === currentStep + 1) {
+                // Next card (peek behind active)
+                if (typeof gsap !== 'undefined') {
+                    gsap.to(card, {
+                        xPercent: 0,
+                        yPercent: 0,
+                        rotation: 0,
+                        scale: 0.95,
+                        y: 16,
+                        opacity: 0.75,
+                        duration: 0.6,
+                        ease: 'power3.out',
+                        pointerEvents: 'none'
+                    });
+                } else {
+                    card.classList.remove('exit');
+                    card.classList.add('scale-[0.95]', 'translate-y-4', 'opacity-75');
+                    card.classList.remove('scale-100', 'translate-y-0', 'opacity-100', 'scale-[0.9]', 'translate-y-8', 'opacity-50');
+                }
+                card.style.zIndex = 20;
+            } else {
+                // Cards further back in stack
+                if (typeof gsap !== 'undefined') {
+                    gsap.to(card, {
+                        xPercent: 0,
+                        yPercent: 0,
+                        rotation: 0,
+                        scale: 0.9,
+                        y: 32,
+                        opacity: 0.5,
+                        duration: 0.6,
+                        ease: 'power3.out',
+                        pointerEvents: 'none'
+                    });
+                } else {
+                    card.classList.remove('exit');
+                    card.classList.add('scale-[0.9]', 'translate-y-8', 'opacity-50');
+                    card.classList.remove('scale-100', 'translate-y-0', 'opacity-100', 'scale-[0.95]', 'translate-y-4', 'opacity-75');
+                }
+                card.style.zIndex = 10;
+            }
+        });
+    }
+
+    // ============================================================
+    // PARALLAX EFFECTS
+    // ============================================================
+
+    window.addEventListener('mousemove', (e) => {
+        const moveX = (e.clientX - window.innerWidth / 2) / 50;
+        const moveY = (e.clientY - window.innerHeight / 2) / 50;
+
+        document.querySelectorAll('.pixel-float').forEach((el, index) => {
+            const speed = (index + 1) * 0.2;
+            el.style.transform = `translate(${moveX * speed}px, ${moveY * speed}px)`;
+        });
+    });
+
+    // ============================================================
+    // FADE-IN ANIMATION
+    // ============================================================
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+
+    // Echo Desktop OS: toggle windows, clock, lucide icons
+    function toggleWindow(id) {
+        let win = document.getElementById(id);
+        if (!win) {
+            if (id === 'win-weather') {
+                const w = weatherData || {condition:'...', temp:'--', icon:'☁️', location:setupConfig?.location||'...'};
+                win = document.createElement('div');
+                win.id = 'win-weather';
+                win.className = 'os-window absolute top-20 right-12 w-[330px] z-50 hidden';
+                win.innerHTML = `
+                    <div class="os-titlebar">
+                        <div class="flex items-center gap-2"><span>☁️</span>
+                            <span class="font-bold text-[10px] uppercase">WEATHER_SENSOR — 7 DAY</span></div>
+                        <div class="window-button bg-secondary" onclick="toggleWindow('win-weather')"></div>
+                    </div>
+                    <div class="p-3 font-mono" id="weather-body"></div>`;
+                document.getElementById('desktop-os').appendChild(win);
+                if (weatherForecast.length > 0) updateWeatherWindow();
+            } else {
+                return;
+            }
+        }
+        
+        // Special handling for the premium chat window (uses flex display)
+        const isChatWin = id === 'win-chat';
+        const isHidden = isChatWin ? (win.style.display === 'none' || win.style.display === '') : win.classList.contains('hidden');
+
+        const windows = document.querySelectorAll('#desktop-os .os-window');
+        if (isHidden) {
+            windows.forEach(w => {
+                if (w !== win) w.style.zIndex = "40";
+            });
+            win.style.zIndex = "65";
+            if (isChatWin) {
+                win.style.display = 'flex';
+                // Initialize drag on chat titlebar
+                const tb = document.getElementById('win-chat-titlebar');
+                if (tb && !tb._dragInit) {
+                    tb._dragInit = true;
+                    let drag=false, ox=0, oy=0;
+                    tb.addEventListener('mousedown', e => {
+                        drag=true;
+                        win.style.transform = 'none';
+                        win.style.bottom = 'auto';
+                        win.style.left = (win.getBoundingClientRect().left) + 'px';
+                        win.style.top = (win.getBoundingClientRect().top) + 'px';
+                        ox = e.clientX - win.getBoundingClientRect().left;
+                        oy = e.clientY - win.getBoundingClientRect().top;
+                        e.preventDefault();
+                    });
+                    document.addEventListener('mousemove', e => { if(drag){ win.style.left=(e.clientX-ox)+'px'; win.style.top=(e.clientY-oy)+'px'; } });
+                    document.addEventListener('mouseup', () => drag=false);
+                }
+            } else {
+                win.classList.remove('hidden');
+            }
+            
+            if (typeof gsap !== 'undefined') {
+                gsap.killTweensOf(win);
+                gsap.fromTo(win, 
+                    { scale: 0.85, opacity: 0 }, 
+                    { scale: 1, opacity: 1, duration: 0.45, ease: "back.out(1.3)" }
+                );
+            }
+        } else {
+            if (typeof gsap !== 'undefined') {
+                gsap.killTweensOf(win);
+                gsap.to(win, {
+                    scale: 0.85,
+                    opacity: 0,
+                    duration: 0.3,
+                    ease: "power2.in",
+                    onComplete: () => {
+                        if (isChatWin) { win.style.display = 'none'; }
+                        else { win.classList.add('hidden'); }
+                        gsap.set(win, { scale: 1, opacity: 1 });
+                    }
+                });
+            } else {
+                if (isChatWin) { win.style.display = 'none'; }
+                else { win.classList.add('hidden'); }
+            }
+        }
+    }
+
+    // ============================================================
+    // DYNAMIC CALENDAR (editable, supports Google Calendar)
+    // ============================================================
+
+    let calendarDate = new Date();
+    let calendarEvents = JSON.parse(localStorage.getItem('ct_calendar_events') || '[]');
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendar-grid');
+        if (!grid) return;
+        const year = calendarDate.getFullYear();
+        const month = calendarDate.getMonth();
+        document.getElementById('calendar-month-label').textContent =
+            new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+
+        let html = '';
+        const headers = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        for (const h of headers) {
+            html += `<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">${h}</div>`;
+        }
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div class="bg-surface-bg p-2 min-h-[40px]"></div>`;
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dayEvents = calendarEvents.filter(e => e.date === dateKey);
+            const isToday = year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+            const cellClass = isToday ? 'bg-primary-container border-2 border-primary' : 'bg-white hover:bg-primary-container';
+            const dot = dayEvents.length > 0 ? `<div class="absolute bottom-1 right-1 w-1.5 h-1.5 bg-primary rounded-full"></div>` : '';
+            html += `<div class="${cellClass} p-1 min-h-[40px] text-[10px] font-mono cursor-pointer transition-colors relative" onclick="calendarClickDay('${dateKey}')">
+                ${d}${dot}
+                ${dayEvents.length ? `<div class="text-[6px] leading-tight mt-0.5 text-primary font-bold truncate">${dayEvents[0].title}</div>` : ''}
+            </div>`;
+        }
+        grid.innerHTML = html;
+
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const todayEvents = calendarEvents.filter(e => e.date === todayKey);
+        document.getElementById('calendar-event-badge').textContent =
+            todayEvents.length ? `✅ ${todayEvents.length} event(s) today` : '✅ No events today';
+
+        const syncBtn = document.getElementById('calendar-google-sync');
+        if (syncBtn) {
+            if (setupConfig?.googleUser) syncBtn.classList.remove('hidden');
+            else syncBtn.classList.add('hidden');
+        }
+
+        renderCalendarEvents();
+    }
+
+    function renderCalendarEvents() {
+        const list = document.getElementById('calendar-event-list');
+        if (!list) return;
+        const sorted = [...calendarEvents].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
+        list.innerHTML = sorted.map((e, i) =>
+            `<div class="flex items-center justify-between bg-surface-container-low p-1 border border-deep-slate-navy text-[10px] font-mono">
+                <span><b>${e.date}</b>: ${escapeHtml(e.title)}</span>
+                <span class="text-secondary cursor-pointer" onclick="calendarDeleteEvent(${i})">✕</span>
+            </div>`
+        ).join('');
+    }
+
+    function calendarMonth(delta) {
+        calendarDate.setMonth(calendarDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function calendarClickDay(dateKey) {
+        const title = prompt('Enter event for ' + dateKey + ':');
+        if (title && title.trim()) {
+            calendarEvents.push({ date: dateKey, title: title.trim() });
+            localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+            renderCalendar();
+            if (setupConfig?.googleUser) syncToGoogleCalendar(dateKey, title.trim());
+        }
+    }
+
+    function calendarAddEvent() {
+        const today = new Date();
+        const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        calendarClickDay(dateKey);
+    }
+
+    function calendarDeleteEvent(index) {
+        calendarEvents.splice(index, 1);
+        localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+        renderCalendar();
+    }
+
+    function syncToGoogleCalendar(date, title) {
+        if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) return;
+        try {
+            const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: localStorage.getItem('ct_google_client_id') || window.__ENV?.GOOGLE_CLIENT_ID || '',
+                scope: 'https://www.googleapis.com/auth/calendar.events',
+                callback: (resp) => {
+                    if (resp.access_token) {
+                        fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer ' + resp.access_token,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                summary: title,
+                                start: { date: date },
+                                end: { date: date }
+                            })
+                        }).catch(() => { });
+                    }
+                }
+            });
+            tokenClient.requestAccessToken();
+        } catch (_) { }
+    }
+
+    function fetchFromGoogleCalendar() {
+        if (!setupConfig?.googleUser || !window.google?.accounts?.oauth2) {
+            if (typeof terminalLog === 'function') terminalLog('[Google] Cannot sync calendar: Not signed in or SDK not loaded', 'warn');
+            return;
+        }
+        try {
+            const clientId = localStorage.getItem('ct_google_client_id') || window.__ENV?.GOOGLE_CLIENT_ID || '';
+            if (!clientId) return;
+            if (typeof terminalLog === 'function') terminalLog('[Google] Requesting token to read Calendar events...', 'run');
+            const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events',
+                callback: async (resp) => {
+                    if (resp.access_token) {
+                        if (typeof terminalLog === 'function') terminalLog('[Google] Token acquired. Fetching events...', 'run');
+                        try {
+                            const now = new Date();
+                            const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+                            const timeMax = new Date(now.getFullYear(), now.getMonth() + 3, 1).toISOString();
+                            const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${timeMin}&timeMax=${timeMax}&maxResults=100`;
+                            const res = await fetch(url, {
+                                headers: { 'Authorization': 'Bearer ' + resp.access_token }
+                            });
+                            if (res.status === 403) throw new Error(`Google Calendar API returned 403 — enable "Google Calendar API" at https://console.cloud.google.com/apis/library/calendar.googleapis.com`);
+                            if (!res.ok) throw new Error(`Google Calendar API returned ${res.status}`);
+                            const data = await res.json();
+                            let addedCount = 0;
+                            if (data.items) {
+                                data.items.forEach(item => {
+                                    const start = item.start?.date || item.start?.dateTime?.split('T')[0];
+                                    const title = item.summary;
+                                    if (start && title) {
+                                        const exists = calendarEvents.some(e => e.date === start && e.title.toLowerCase() === title.toLowerCase());
+                                        if (!exists) {
+                                            calendarEvents.push({ date: start, title: title.trim() });
+                                            addedCount++;
+                                        }
+                                    }
+                                });
+                                if (addedCount > 0) {
+                                    localStorage.setItem('ct_calendar_events', JSON.stringify(calendarEvents));
+                                    renderCalendar();
+                                    if (typeof terminalLog === 'function') terminalLog(`[Google] Synced ${addedCount} event(s) from Google Calendar!`, 'ok');
+                                } else {
+                                    if (typeof terminalLog === 'function') terminalLog('[Google] Calendar is up-to-date.', 'ok');
+                                }
+                            }
+                        } catch (e) {
+                            if (typeof terminalLog === 'function') terminalLog(`[Google] Failed to fetch events: ${e.message}`, 'err');
+                        }
+                    }
+                }
+            });
+            tokenClient.requestAccessToken();
+        } catch (err) {
+            if (typeof terminalLog === 'function') terminalLog(`[Google] OAuth client error: ${err.message}`, 'err');
+        }
+    }
+    window.fetchFromGoogleCalendar = fetchFromGoogleCalendar;
+
+    function openMenuEditor() {
+        toggleWindow('win-menu-editor');
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        days.forEach(d => {
+            const item = setupConfig.weeklyMenu?.[d] || 'pasta';
+            const parts = item.split(':');
+            const type = parts[0] || 'pasta';
+            const name = parts[1] || '';
+            
+            const typeEl = document.getElementById(`menu-edit-${d}-type`);
+            const nameEl = document.getElementById(`menu-edit-${d}-name`);
+            if (typeEl) typeEl.value = type;
+            if (nameEl) nameEl.value = name;
+        });
+    }
+    window.openMenuEditor = openMenuEditor;
+
+    function saveStructuredMenu() {
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        if (!setupConfig.weeklyMenu) setupConfig.weeklyMenu = {};
+        days.forEach(d => {
+            const type = document.getElementById(`menu-edit-${d}-type`).value;
+            const name = document.getElementById(`menu-edit-${d}-name`).value.trim();
+            setupConfig.weeklyMenu[d] = name ? `${type}:${name}` : type;
+        });
+        localStorage.setItem('ct_setup_config', JSON.stringify(setupConfig));
+        if (typeof terminalLog === 'function') terminalLog('MENU: Structured weekly menu configuration saved ✓', 'ok');
+        toggleWindow('win-menu-editor');
+        
+        // Update widgets
+        if (typeof updateWidgets === 'function') updateWidgets();
+    }
+    window.saveStructuredMenu = saveStructuredMenu;
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    renderCalendar();
+
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    } else {
+        const emojiMap = {
+            'cloud-sun':'☁️','zap':'⚡','smile':'😊','leaf':'🌿','banknote':'💰',
+            'message-circle':'💬','cpu':'🖥️','calendar':'📅','chevron-left':'◀','chevron-right':'▶',
+            'file-spreadsheet':'📊','brain-circuit':'🧠','terminal':'💻','key':'🔑','search':'🔍'
+        };
+        document.querySelectorAll('[data-lucide]').forEach(el => {
+            const e = emojiMap[el.getAttribute('data-lucide')] || '▪';
+            el.outerHTML = `<span style="font-size:${el.classList.contains('w-10')?'40px':el.classList.contains('w-4')?'16px':el.classList.contains('w-3')?'12px':'24px'}">${e}</span>`;
+        });
+    }
+
+    setInterval(() => {
+        const now = new Date();
+        const clockEl = document.getElementById('taskbar-time');
+        const dateEl = document.getElementById('taskbar-date');
+        if (clockEl) clockEl.textContent = now.toLocaleString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+    }, 1000);
+
+    // Drag functionality for os-windows (runs regardless of Lucide)
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.os-titlebar').forEach(titlebar => {
+            const window_el = titlebar.closest('.os-window');
+            if (!window_el) return;
+            let isDragging = false;
+            let startX, startY, origX, origY;
+
+            titlebar.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                const rect = window_el.getBoundingClientRect();
+                startX = e.clientX;
+                startY = e.clientY;
+                origX = rect.left;
+                origY = rect.top;
+                window_el.style.position = 'absolute';
+                window_el.style.left = origX + 'px';
+                window_el.style.top = origY + 'px';
+                window_el.style.transform = 'none';
+                window_el.style.bottom = 'auto';
+                window_el.style.right = 'auto';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                window_el.style.left = (origX + dx) + 'px';
+                window_el.style.top = (origY + dy) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        });
+    });
+</script>
+<script src="js/config.js?v=20260620u"></script>
+<script src="js/data.js?v=20260620u"></script>
+<script src="js/agents.js?v=20260620u"></script>
+<script src="js/npc.js?v=20260620u"></script>
+<script src="js/simulation.js?v=20260620u"></script>
+<script src="js/ui.js?v=20260620u"></script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CanteenTycoon AI • BRIX Edition</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&amp;family=VT323&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --deep-slate-navy: #0f172a;
+            --surface-bg: #f1f5f9;
+            --game-emerald: #10b981;
+            --pixel-border: 4px;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--surface-bg);
+            color: var(--deep-slate-navy);
+            overflow-x: hidden;
+        }
+
+        .pixel-font { font-family: 'VT323', monospace; }
+
+        /* BRIX Wave Shader Background Simulation */
+        .wave-bg {
+            background-color: var(--surface-bg);
+            background-image: radial-gradient(var(--game-emerald) 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative;
+        }
+
+        /* Modernized Card Style */
+        .brix-card {
+            background: #ffffff;
+            border: var(--pixel-border) solid var(--deep-slate-navy);
+            border-radius: 24px;
+            box-shadow: 8px 8px 0px 0px rgba(15, 23, 42, 0.1);
+        }
+
+        .brix-button {
+            background: var(--game-emerald);
+            color: white;
+            border: var(--pixel-border) solid var(--deep-slate-navy);
+            border-radius: 12px;
+            box-shadow: 0px 4px 0px 0px var(--deep-slate-navy);
+            transition: all 0.1s ease;
+            font-weight: 800;
+        }
+
+        .brix-button:active {
+            transform: translateY(4px);
+            box-shadow: 0px 0px 0px 0px var(--deep-slate-navy);
+        }
+
+        .capsule-badge {
+            background: rgba(16, 185, 129, 0.1);
+            border: 2px solid var(--game-emerald);
+            border-radius: 9999px;
+            padding: 4px 16px;
+            color: var(--game-emerald);
+            font-weight: 700;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Dash Elements */
+        .sidebar-card {
+            background: #ffffff;
+            border: var(--pixel-border) solid var(--deep-slate-navy);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+        }
+
+        .floating-sprite {
+            position: absolute;
+            pointer-events: none;
+            filter: drop-shadow(4px 4px 0px rgba(15, 23, 42, 0.1));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Action Bar Steps */
+        .step-circle {
+            width: 24px;
+            height: 24px;
+            background: var(--deep-slate-navy);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body class="wave-bg">
+<!-- Phase 1: Welcome Gate -->
+<section class="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden" id="welcome-gate">
+<!-- Ambient Sprites -->
+<img alt="Cloud" class="floating-sprite top-[10%] left-[5%] w-32 opacity-20" src="https://lh3.googleusercontent.com/aida/AP1WRLsIfRqLHSE8Dzi1uTlT_rOxqEB3JBH8BR0VWWW3o-uWJHmV5cPMp8Jax7eEBTeRp2DlHp1_qSaE0ra8HQ3G7Ep_-PK6UERlv9C8Xn7bqr9SiawJX6YIENipR3qGVfR6GtJ7T8AVcMf0ONEVg3DLlrGx4DlB1EQ3gWsHjJ8MmYuFDaa_FIcssygkD_7D_iJJL7ZKgC4cZGleKiXPJYqN3WI6bEuSoZW8Fhq-Gcc4auSucVKwX6zHgNLERGw"/>
+<img alt="Cloud" class="floating-sprite top-[15%] right-[8%] w-40 opacity-20" src="https://lh3.googleusercontent.com/aida/AP1WRLsIfRqLHSE8Dzi1uTlT_rOxqEB3JBH8BR0VWWW3o-uWJHmV5cPMp8Jax7eEBTeRp2DlHp1_qSaE0ra8HQ3G7Ep_-PK6UERlv9C8Xn7bqr9SiawJX6YIENipR3qGVfR6GtJ7T8AVcMf0ONEVg3DLlrGx4DlB1EQ3gWsHjJ8MmYuFDaa_FIcssygkD_7D_iJJL7ZKgC4cZGleKiXPJYqN3WI6bEuSoZW8Fhq-Gcc4auSucVKwX6zHgNLERGw" style="animation-delay: 1s;"/>
+<img alt="Star" class="floating-sprite bottom-[20%] left-[10%] w-16" src="https://lh3.googleusercontent.com/aida/AP1WRLu_2xfvP94WjCs9wKnT47V77vj3z_LlxC_HDMYEk23XWfRqpJggyebBvhNQ6F8BXQ1inIuH_rO1OopDXxcHJ6Ub4JxrhKQGdsh6tjNzBT_UfeY1DQ8LmbSmdQTk3Bq4pY9twrQVZKX9My0YqTUx1NT4T5s4ts4qvN8aUe9BqokOBBG8NP1ExKGp-XR5eqK-ywZ60eE80Ex4HFgvSTPqEE9QNTitOetfAaUklVmz95ALEz_wAgfDCnoPmwg" style="animation-delay: 0.5s;"/>
+<img alt="Star" class="floating-sprite top-[30%] right-[15%] w-12" src="https://lh3.googleusercontent.com/aida/AP1WRLu_2xfvP94WjCs9wKnT47V77vj3z_LlxC_HDMYEk23XWfRqpJggyebBvhNQ6F8BXQ1inIuH_rO1OopDXxcHJ6Ub4JxrhKQGdsh6tjNzBT_UfeY1DQ8LmbSmdQTk3Bq4pY9twrQVZKX9My0YqTUx1NT4T5s4ts4qvN8aUe9BqokOBBG8NP1ExKGp-XR5eqK-ywZ60eE80Ex4HFgvSTPqEE9QNTitOetfAaUklVmz95ALEz_wAgfDCnoPmwg" style="animation-delay: 1.5s;"/>
+<!-- Character Sprites -->
+<img alt="Student 1" class="floating-sprite top-[25%] left-[18%] w-24" src="https://lh3.googleusercontent.com/aida/AP1WRLvLEiXDa9ECvHDJ94l-nEJZgi1eBSLgwvWbOIYnVMVyMhyXN9gyWTkJo3w8YYrn98tHdvNw7mz5DnVm1y8bPhDtrnZeYB5CmRahzGjsb3jyCFRA9tehCun1AGEsKGeRshykxHQkmHTQfC308OEo5eY6VxvM7BOvLwqqqnh3WtP3RcSNxhKz6juHeBBVmMaRkDvP_c43HIKKrB1ELl5Rq0-XbTN0_tTMPRVbVDIcFDzWThPre96Ne2IZEGM"/>
+<img alt="Student 2" class="floating-sprite bottom-[25%] left-[25%] w-28" src="https://lh3.googleusercontent.com/aida/AP1WRLs3PT3SRfDS3HycSsQTeJ5jGMohfGDQ9tKQSnwpx1kKr2kkr5kNiSFsHTx5sFrI2qBd8cZZGCOuuYpvH7OfrxN83Wcx3ifAq2fwLBELdCEGZp4YIneG8FjOuRASUwaSNV7hUfejx4uowLNiP-6ot4M4zDpaNjFTP_41RjhHDsuUauHQlVmVc5HvkcJ6-WI2tt0voQ24Wal_h2wcp8pWH2PxbPJkQalEgPZS0NWFSmzqHigASdfpwgPnQg" style="animation-delay: 0.8s;"/>
+<img alt="Cook" class="floating-sprite top-[20%] right-[20%] w-24" src="https://lh3.googleusercontent.com/aida/AP1WRLtQbZRNg4p5snw20fHOIqvTjBfYPDGJMACSzMLdPf4lMwlu4JrDQxhHSRs5GY5yj8nWdWAwL7gpu_0Lm0DNXFQjBuJ3vyJBztY0i7JrFGm1cGXILCt5qmYPzIq6wrMrCclK3ABXcdxFuqjweV_PPYektHC-gCcmwFQ4k4GE9nl7M3sc6BewdrxJN_W-woVRmUCavsA3VL0w-UIB9cAaPzHHknuiIWBf8ZDMQkpuOhG7QaDqlKwtnyNjHiw" style="animation-delay: 0.4s;"/>
+<div class="z-10 text-center px-4 max-w-xl w-full">
+<div class="brix-card p-12 flex flex-col items-center">
+<div class="mb-6">
+<span class="capsule-badge">🌱 FOOD WASTE RADAR</span>
+</div>
+<h1 class="pixel-font text-6xl uppercase mb-4 tracking-tight text-[#0f172a]">CANTEENTYCOON AI</h1>
+<p class="text-slate-500 mb-10 font-medium">Revolutionizing campus sustainability through <br/>high-fidelity simulation.</p>
+<div class="w-full space-y-6">
+<button class="brix-button px-10 py-5 w-full flex items-center justify-center gap-3 text-xl" onclick="initializeWorld()">
+                    Create Your World ✨
+                </button>
+<p class="pixel-font text-sm text-slate-400">ENGINE_READY_v2.4</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Phase 2: Dashboard -->
+<main class="hidden h-screen flex flex-col relative z-10 bg-[#f1f5f9]" id="main-workspace">
+<!-- Navbar -->
+<header class="w-full border-b-4 border-slate-900 bg-white px-6 py-3 flex justify-between items-center z-50">
+<div class="flex items-center gap-6">
+<span class="pixel-font text-3xl uppercase text-slate-900 font-bold">CanteenTycoon AI</span>
+<div class="flex items-center gap-2 px-3 py-1 bg-emerald-50 border-2 border-emerald-100 rounded-full">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="text-xs font-bold text-emerald-700">CORE SYSTEM LIVE</span>
+</div>
+</div>
+<nav class="flex gap-3">
+<button class="px-4 py-1 rounded-lg border-2 border-slate-200 text-slate-500 font-bold text-sm hover:border-slate-900 hover:text-slate-900 transition-all" onclick="setMode('cloud')">CLOUD_ENGINE</button>
+<button class="px-4 py-1 rounded-lg border-2 border-slate-900 bg-slate-900 text-white font-bold text-sm" onclick="setMode('local')">LOCAL_NODE</button>
+<div class="flex items-center gap-3 ml-6 text-slate-400">
+<span class="material-symbols-outlined cursor-pointer hover:text-slate-900">sensors</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-slate-900">settings</span>
+</div>
+</nav>
+</header>
+<!-- Action Bar -->
+<div class="w-full bg-white border-b-4 border-slate-900 px-6 py-3 flex items-center gap-8 overflow-x-auto">
+<button class="flex items-center gap-2 text-slate-900 font-bold group">
+<span class="step-circle">1</span> LOAD_BLUEPRINT
+        </button>
+<span class="text-slate-200">|</span>
+<button class="flex items-center gap-2 text-slate-400 font-bold hover:text-slate-600 transition-colors">
+<span class="step-circle bg-slate-200 text-slate-400">2</span> SYNTHESIZE_MAP
+        </button>
+<span class="text-slate-200">|</span>
+<button class="flex items-center gap-2 text-slate-400 font-bold hover:text-slate-600 transition-colors">
+<span class="step-circle bg-slate-200 text-slate-400">3</span> EXEC_SIM
+        </button>
+</div>
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-[400px] border-r-4 border-slate-900 bg-[#f8fafc] overflow-y-auto flex flex-col p-6 gap-6">
+<!-- Metrics Panel -->
+<div class="sidebar-card">
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-bold text-lg uppercase tracking-tight text-slate-900">Entity Metrics</h2>
+<span class="material-symbols-outlined text-slate-400">analytics</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+<p class="text-[10px] text-slate-400 uppercase font-extrabold mb-1">Current Pop</p>
+<p class="text-2xl text-slate-900 font-black" id="s-students">1,248</p>
+</div>
+<div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+<p class="text-[10px] text-slate-400 uppercase font-extrabold mb-1">Saturation</p>
+<p class="text-2xl text-emerald-600 font-black" id="s-hunger">64%</p>
+</div>
+</div>
+</div>
+<!-- Ecological Stats -->
+<div class="sidebar-card border-emerald-500/20 bg-emerald-50/30">
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-bold text-lg uppercase tracking-tight text-emerald-900">Carbon Analysis</h2>
+<span class="material-symbols-outlined text-emerald-500">eco</span>
+</div>
+<div class="space-y-4">
+<div class="bg-white p-3 rounded-xl border border-emerald-100">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-extrabold text-emerald-700">EMISSION_THRESHOLD</span>
+<span class="text-sm font-black text-emerald-900" id="w-co2">0.42mg/m³</span>
+</div>
+<div class="w-full bg-emerald-100 h-3 rounded-full overflow-hidden">
+<div class="bg-emerald-500 h-full" style="width: 42%;"></div>
+</div>
+</div>
+<p class="text-xs font-bold text-slate-500">CO2_EQUIVALENT: <span class="text-slate-900" id="w-equiv">12.4t</span></p>
+</div>
+</div>
+<!-- Media Upload -->
+<div class="sidebar-card">
+<h2 class="font-bold text-lg uppercase mb-4 text-slate-900">Floor Plan</h2>
+<div class="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-all group" id="photo-input">
+<span class="material-symbols-outlined text-3xl block mb-2 text-slate-300 group-hover:text-emerald-500">upload_file</span>
+<p class="text-xs font-black text-slate-400 group-hover:text-emerald-700 uppercase">Upload Blueprint .EXE</p>
+</div>
+<div class="hidden mt-4 rounded-xl border-2 border-slate-100 h-32 bg-slate-50 flex items-center justify-center" id="photo-preview">
+<span class="material-symbols-outlined text-slate-300">image</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="mt-auto space-y-3">
+<button class="brix-button w-full py-4 flex justify-between items-center px-6" id="btn-a1" onclick="triggerAgent1()">
+<span>DEPLOY_SQUAD_ALPHA</span>
+<span class="material-symbols-outlined">bolt</span>
+</button>
+<button class="bg-white hover:bg-slate-50 text-slate-900 font-extrabold py-4 flex justify-between items-center px-6 border-4 border-slate-900 rounded-xl shadow-[4px_4px_0px_0px_#0f172a] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all">
+<span>BOOT_SQUAD_BETA</span>
+<span class="material-symbols-outlined">precision_manufacturing</span>
+</button>
+</div>
+</aside>
+<!-- Simulation Deck -->
+<section class="flex-1 flex flex-col p-8 overflow-hidden gap-6">
+<div class="grid grid-cols-2 gap-6">
+<div class="bg-white border-4 border-slate-900 p-6 rounded-3xl">
+<p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Atmospheric CO2 Now</p>
+<p class="pixel-font text-5xl text-emerald-600" id="co2-now">412.5 PPM</p>
+</div>
+<div class="bg-white border-4 border-slate-900 p-6 rounded-3xl">
+<p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Carbon Diverted</p>
+<p class="pixel-font text-5xl text-slate-900" id="co2-saved">824.1 KG</p>
+</div>
+</div>
+<!-- Canvas Frame -->
+<div class="flex-1 bg-white border-4 border-slate-900 rounded-[32px] overflow-hidden relative shadow-[12px_12px_0px_0px_rgba(15,23,42,0.05)]">
+<div class="absolute inset-0 bg-emerald-500/5 pointer-events-none z-10"></div>
+<canvas class="w-full h-full" id="gameCanvas"></canvas>
+<!-- HUD Overlays -->
+<div class="absolute bottom-6 left-6 bg-slate-900 text-white px-4 py-2 rounded-xl font-bold text-xs tracking-wider z-20 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    CAM_VIEW_01: MAIN_LOBBY
+                </div>
+<div class="absolute top-6 right-6 flex gap-3 z-20">
+<button class="w-12 h-12 bg-white border-4 border-slate-900 rounded-xl flex items-center justify-center hover:bg-emerald-50 transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="w-12 h-12 bg-white border-4 border-slate-900 rounded-xl flex items-center justify-center hover:bg-emerald-50 transition-colors">
+<span class="material-symbols-outlined">videocam</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Verification Modal -->
+<div class="hidden fixed inset-0 z-[1000] flex items-center justify-center p-6" id="modal">
+<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+<div class="brix-card max-w-md w-full p-10 z-10 relative">
+<h2 class="pixel-font text-4xl text-slate-900 uppercase mb-4 font-bold">Manual override</h2>
+<div class="bg-slate-50 border-2 border-slate-100 rounded-2xl p-6 mb-8">
+<p class="mb-2 text-emerald-600 font-black text-xs uppercase tracking-widest">PROTOCOL_42-X_TRIGGERED</p>
+<p class="text-slate-600 leading-relaxed font-medium">System requires human confirmation to initiate the Carbon Recovery sequence. Estimated efficiency is within acceptable parameters.</p>
+</div>
+<div class="flex gap-4">
+<button class="flex-1 font-black text-slate-400 hover:text-slate-900 transition-colors" onclick="document.getElementById('modal').classList.add('hidden')">ABORT</button>
+<button class="flex-2 brix-button px-8 py-3" onclick="confirmRescue()">EXECUTE_RESCUE</button>
+</div>
+</div>
+</div>
+<script>
+    function initializeWorld() {
+        const gate = document.getElementById('welcome-gate');
+        gate.style.transition = 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+        gate.style.opacity = '0';
+        gate.style.transform = 'scale(1.05) translateY(-20px)';
+        setTimeout(() => {
+            gate.classList.add('hidden');
+            document.getElementById('main-workspace').classList.remove('hidden');
+            initCanvas();
+        }, 600);
+    }
+
+    function setMode(mode) {
+        console.log('Simulation mode changed:', mode);
+    }
+
+    function triggerAgent1() {
+        document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function confirmRescue() {
+        console.log('Rescue sequence confirmed');
+        document.getElementById('modal').classList.add('hidden');
+    }
+
+    function initCanvas() {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        
+        window.addEventListener('resize', resize);
+        resize();
+
+        function draw() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Modern Dot Grid
+            ctx.fillStyle = '#f1f5f9';
+            const step = 40;
+            for(let x = 0; x < canvas.width; x += step) {
+                for(let y = 0; y < canvas.height; y += step) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Simulated Entities (Brix Pixel Style)
+            const time = Date.now() * 0.002;
+            for(let i=0; i<12; i++) {
+                const x = (Math.sin(time + i) * 150) + (canvas.width/2);
+                const y = (Math.cos(time * 0.7 + i) * 120) + (canvas.height/2);
+                
+                // Character shadow
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.05)';
+                ctx.fillRect(Math.floor(x/4)*4 + 4, Math.floor(y/4)*4 + 4, 16, 16);
+
+                // Pixel Body
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(Math.floor(x/4)*4, Math.floor(y/4)*4, 16, 16);
+                
+                // Details
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(Math.floor(x/4)*4 + 4, Math.floor(y/4)*4 + 4, 4, 4);
+                
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(Math.floor(x/4)*4, Math.floor(y/4)*4, 16, 16);
+            }
+
+            requestAnimationFrame(draw);
+        }
+        draw();
+    }
+
+    const dropzone = document.getElementById('photo-input');
+    dropzone.addEventListener('click', () => {
+        document.getElementById('photo-preview').classList.remove('hidden');
+        dropzone.classList.add('hidden');
+    });
+
+    function handlePhotoUpload(event) {
+        console.log('File selected:', event.target.files[0]);
+    }
+</script>
+</body></html>

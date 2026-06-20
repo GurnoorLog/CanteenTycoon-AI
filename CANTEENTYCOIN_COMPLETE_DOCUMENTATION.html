@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CanteenTycoon AI — Complete System Documentation</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 40px 24px; color: #0f172a; background: #f8fafc; }
+h1 { background: linear-gradient(135deg, #0f172a, #1e293b); color: white; padding: 24px 32px; border-radius: 12px; font-size: 28px; margin-bottom: 8px; }
+.subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; font-family: monospace; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; }
+h2 { color: #0f172a; font-size: 22px; margin-top: 40px; padding-bottom: 8px; border-bottom: 4px solid #6366f1; }
+h3 { color: #1e293b; font-size: 18px; margin-top: 28px; padding-left: 12px; border-left: 4px solid #10b981; }
+h4 { color: #475569; font-size: 15px; margin-top: 20px; }
+p { line-height: 1.8; font-size: 14px; color: #334155; margin: 10px 0; }
+ul, ol { margin: 10px 0 10px 24px; }
+li { margin: 6px 0; line-height: 1.6; font-size: 14px; color: #334155; }
+code { background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 13px; border: 1px solid #e2e8f0; font-family: 'Consolas', 'Courier New', monospace; }
+pre { background: #0f172a; color: #e2e8f0; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.6; margin: 12px 0; font-family: 'Consolas', 'Courier New', monospace; }
+pre .k { color: #818cf8; } pre .s { color: #34d399; } pre .c { color: #64748b; } pre .n { color: #e2e8f0; } pre .f { color: #f472b6; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+th { background: #0f172a; color: white; padding: 10px 14px; text-align: left; font-weight: 600; }
+td { padding: 8px 14px; border-bottom: 1px solid #e2e8f0; }
+tr:nth-child(even) td { background: #f8fafc; }
+tr:hover td { background: #eef2ff; }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; font-family: monospace; }
+.tag-js { background: #fef3c7; color: #92400e; }
+.tag-py { background: #dbeafe; color: #1e40af; }
+.tag-html { background: #fce7f3; color: #9d174d; }
+.tag-css { background: #d1fae5; color: #065f46; }
+.card { background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 16px 0; box-shadow: 4px 4px 0 #e2e8f0; }
+.metric { display: inline-flex; align-items: center; gap: 6px; background: #0f172a; color: white; padding: 4px 12px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+.flow-arrow { color: #6366f1; font-size: 20px; margin: 4px 0; }
+.section-toc { background: #f1f5f9; border: 2px solid #e2e8f0; border-radius: 8px; padding: 16px 24px; margin: 20px 0; }
+.section-toc a { color: #6366f1; text-decoration: none; font-size: 14px; display: block; padding: 3px 0; }
+.section-toc a:hover { text-decoration: underline; }
+@media print { body { padding: 20px; } h1 { background: #0f172a !important; -webkit-print-color-adjust: exact; } th { background: #0f172a !important; -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+
+<h1>🏫 CanteenTycoon AI — Complete System Documentation</h1>
+<div class="subtitle">Generated: June 20, 2026 | Codebase: 6 JS files + 2 Python servers + HTML shell | Total: ~6,000 lines</div>
+
+<!-- ============================================================ -->
+<div class="section-toc">
+<strong>📑 Table of Contents</strong><br><br>
+<a href="#s1">1. System Overview</a>
+<a href="#s2">2. Architecture & File Map</a>
+<a href="#s3">3. File-by-File Deep Analysis</a>
+<a href="#s4">4. Data Flow: User Message → AI Response</a>
+<a href="#s5">5. All Changes Made (Complete History)</a>
+<a href="#s6">6. Key Design Decisions</a>
+<a href="#s7">7. How to Run & Deploy</a>
+<a href="#s8">8. Code Quality & Technical Debt</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s1">1. System Overview</h2>
+
+<div class="card">
+<p><strong>CanteenTycoon AI</strong> is a browser-based desktop operating system simulation for school cafeteria food waste management. It combines a <strong>LightGBM machine learning model</strong> (trained on 2,600+ real university canteen records) with <strong>Claude 3.5 Sonnet</strong> as an intelligent orchestrator to predict, analyze, and reduce food waste.</p>
+
+<p><strong>Core Principles:</strong></p>
+<ul>
+<li><strong>Zero hardcoded data</strong> — Every prediction is driven by the LightGBM model + live weather + calendar</li>
+<li><strong>Claude as orchestrator</strong> — Claude routes intents, calls tools, generates predictions, and creates PDFs of anything</li>
+<li><strong>Visual simulation is decorative</strong> — NPCs walking around and simulated waste events are visual-only; Claude uses only real data (ML model, weather, calendar)</li>
+<li><strong>Proxy architecture</strong> — All external APIs route through a local Python proxy server to avoid CORS issues</li>
+</ul>
+
+<p><strong>Tech Stack:</strong> <span class="tag tag-html">HTML5</span> <span class="tag tag-css">Tailwind CSS</span> <span class="tag tag-js">Vanilla JS (3,166 lines)</span> <span class="tag tag-py">Python (328 lines)</span> <span class="tag tag-py">Flask</span> <span class="tag tag-py">LightGBM</span> GSAP (animations) · Lucide (icons) · Claude 3.5 Sonnet · Gemini 2.5</p>
+</div>
+
+<h3>Feature Overview</h3>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Key File</th></tr>
+<tr><td>🤖 AI Chat</td><td>Full conversational assistant with intent routing; can answer questions, run forecasts, generate PDFs</td><td><code>agents.js</code></td></tr>
+<tr><td>📊 Waste Forecast</td><td>LightGBM model + weather + calendar → Claude synthesizes prediction → animated report</td><td><code>agents.js:494</code>, <code>ui.js:465</code></td></tr>
+<tr><td>🗺️ Map Generation</td><td>Upload cafeteria photo → Gemini generates pixel-art map → AI detects zones</td><td><code>agents.js:372</code></td></tr>
+<tr><td>👥 NPC Simulation</td><td>Up to 50 students with state-machine AI, manager character, waste probability model</td><td><code>npc.js</code>, <code>simulation.js</code></td></tr>
+<tr><td>📅 Calendar Sync</td><td>Google Calendar OAuth integration; events auto-sync to desktop calendar</td><td><code>index.html:1777</code></td></tr>
+<tr><td>🌤️ Weather</td><td>7-day Open-Meteo forecast with geocoding from wizard location</td><td><code>data.js:53</code></td></tr>
+<tr><td>📄 PDF Generator</td><td>General-purpose Markdown→HTML→PDF for any content (forecasts, menus, reports)</td><td><code>ui.js:769</code></td></tr>
+<tr><td>🍽️ Menu Editor</td><td>Weekly menu configuration (Mon–Sat) persisted to localStorage</td><td><code>index.html:2360</code></td></tr>
+<tr><td>📈 Live Widgets</td><td>GSAP-animated counters for efficiency, waste reduction, meals saved, CO₂ offset</td><td><code>ui.js:173</code></td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s2">2. Architecture & File Map</h2>
+
+<h3>2.1 File Inventory</h3>
+<table>
+<tr><th>File</th><th>Lines</th><th>Type</th><th>Role</th></tr>
+<tr><td><code>index.html</code></td><td>2,468</td><td><span class="tag tag-html">HTML</span></td><td>Single-page app shell: all markup, inline CSS (~300 rules), inline JS (wizard, calendar, window manager)</td></tr>
+<tr><td><code>js/config.js</code></td><td>77</td><td><span class="tag tag-js">JS</span></td><td>Constants, environment variable loader, global state seed</td></tr>
+<tr><td><code>js/data.js</code></td><td>291</td><td><span class="tag tag-js">JS</span></td><td>Data fetchers: weather (Open-Meteo), web search (DuckDuckGo), ML API (LightGBM)</td></tr>
+<tr><td><code>js/agents.js</code></td><td>1,161</td><td><span class="tag tag-js">JS</span></td><td>AI orchestration: Claude/Gemini/Ollama wrappers, 3-agent pipeline, intent router, autonomous loop</td></tr>
+<tr><td><code>js/npc.js</code></td><td>191</td><td><span class="tag tag-js">JS</span></td><td>Sprite-based NPC engine: StudentNPC, ManagerNPC classes with state machines</td></tr>
+<tr><td><code>js/simulation.js</code></td><td>170</td><td><span class="tag tag-js">JS</span></td><td>Canvas game loop, HUD controls, spawn/init</td></tr>
+<tr><td><code>js/ui.js</code></td><td>1,276</td><td><span class="tag tag-js">JS</span></td><td>Desktop OS UI: windows, terminal, chat, widgets, prediction paper, exports (40+ functions)</td></tr>
+<tr><td><code>server.py</code></td><td>244</td><td><span class="tag tag-py">Python</span></td><td>Multi-threaded HTTP proxy server (Claude, Gemini, ML, DuckDuckGo)</td></tr>
+<tr><td><code>app.py</code></td><td>52</td><td><span class="tag tag-py">Python</span></td><td>Flask ML inference server (LightGBM waste predictor)</td></tr>
+<tr><td><code>data/food_waste.json</code></td><td>~2,600</td><td>JSON</td><td>Real university canteen historical waste records (reference dataset)</td></tr>
+</table>
+
+<h3>2.2 Server Architecture</h3>
+<pre>
+┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Browser    │────▶│  server.py:8080  │────▶│  app.py:5000     │
+│  index.html  │     │  (Static + Proxy) │     │  (LightGBM ML)   │
+│  JS files    │     │                   │     └─────────────────┘
+│  Canvas      │     │  /proxy/claude ──▶│───▶ Anthropic API
+└─────────────┘     │  /proxy/gemini ──▶│───▶ Google Gemini API
+                    │  /proxy/ml ──────▶│───▶ localhost:5000
+                    │  /proxy/ddg ─────▶│───▶ DuckDuckGo API
+                    └─────────────────┘
+</pre>
+
+<h3>2.3 File Dependency Graph</h3>
+<pre>
+index.html (inline JS)
+    ├── config.js (constants, env vars)
+    ├── data.js (weather, ML, calendar)
+    │    └── agents.js (AI wrappers, 3 agents, intent router)
+    │         ├── npc.js (StudentNPC, ManagerNPC)
+    │         └── simulation.js (game loop, canvas)
+    └── ui.js (desktop UI, chat, widgets, exports)
+         └── simulation.js
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="s3">3. File-by-File Deep Analysis</h2>
+
+<!-- config.js -->
+<h3>3.1 <code>js/config.js</code> — Configuration & State (77 lines)</h3>
+<div class="card">
+<p><strong>Functions:</strong> <code>cleanKey(k)</code> — strips placeholder API keys; IIFE <code>__applyEnv()</code> — loads from <code>api.env</code></p>
+<p><strong>Constants:</strong> <code>CLAUDE_MODEL='claude-sonnet-4-5'</code>, <code>GEMINI_IMG_MODEL='gemini-2.5-flash-image'</code>, proxy URLs, canvas dimensions, waste constants</p>
+<p><strong>Global State:</strong> <code>currentMode</code>, <code>uploadedPhotoB64</code>, <code>generatedMapB64</code>, <code>currentPrediction</code>, <code>weatherData</code>, <code>weatherForecast</code>, <code>lastMLPrediction</code>, legacy NIM stubs</p>
+<p><strong>Design Note:</strong> All API keys are sanitized by <code>cleanKey()</code> which treats <code>"YOUR_*"</code> or <code>"KEY_HERE"</code> as empty. Keys load from localStorage first, fall back to <code>api.env</code> via polling.</p>
+</div>
+
+<!-- data.js -->
+<h3>3.2 <code>js/data.js</code> — Data Layer (291 lines)</h3>
+<div class="card">
+<p><strong>Key Functions:</strong></p>
+<table>
+<tr><th>Function</th><th>Lines</th><th>What it does</th></tr>
+<tr><td><code>loadHistoricalData()</code></td><td>5–26</td><td>Fetches <code>data/food_waste.json</code> (2,600 records) into <code>DATASET_HISTORY</code></td></tr>
+<tr><td><code>fetchWeather()</code></td><td>53–115</td><td>Geocodes location → Open-Meteo 7-day forecast → populates <code>weatherForecast[]</code> + <code>weatherData</code></td></tr>
+<tr><td><code>getCalendar()</code></td><td>117–126</td><td>Returns event type based on month/day or <code>setupConfig.calendarEvent</code></td></tr>
+<tr><td><code>fetchWebContext()</code></td><td>128–175</td><td>DuckDuckGo search via proxy with rate limiting (3/day) + 4-hour cache</td></tr>
+<tr><td><code>callLocalML()</code></td><td>193–210</td><td>POST <code>/proxy/ml</code> with <code>{Date, Meal, Section, Category}</code>, returns <code>predicted_waste_kg</code></td></tr>
+<tr><td><code>refreshMLPrediction()</code></td><td>212–253</td><td>Batches 4 calls (sections A–D) for today's lunch, stores in <code>lastMLPrediction</code></td></tr>
+</table>
+</div>
+
+<!-- agents.js -->
+<h3>3.3 <code>js/agents.js</code> — AI Core (1,161 lines) ⭐</h3>
+<div class="card">
+<p>This is the largest and most complex file — the AI orchestration layer.</p>
+
+<h4>Intent Router</h4>
+<pre>
+callClaudeIntent(userMessage, contextData)
+    │
+    ├── POST /proxy/claude with structured JSON schema
+    │   Prompt: "Classify into FORECAST | CHAT | SIMULATION_CONTROL | DATA_QUERY"
+    │
+    └── Returns: { intent, confidence, params, chat_reply }
+</pre>
+
+<h4>3-Agent Pipeline</h4>
+<table>
+<tr><th>Agent</th><th>Function</th><th>Input</th><th>AI Model</th><th>Output</th></tr>
+<tr><td>Agent 1</td><td><code>runAgent1()</code></td><td>Photo + pixel art map</td><td>Gemini Vision</td><td>Zone coordinates (serving, seating, bins, entrance)</td></tr>
+<tr><td>Agent 2</td><td><code>runAgent2()</code></td><td>ML baseline + weather + calendar + menu</td><td>Claude 3.5 Sonnet</td><td>Structured JSON: waste risk %, predicted kg, CO₂, rescue needed</td></tr>
+<tr><td>Agent 3</td><td><code>runAgent3()</code></td><td>Agent 2's prediction</td><td>Claude 3.5 Sonnet</td><td>Food rescue dispatch message</td></tr>
+</table>
+
+<h4>Autonomous Loop</h4>
+<pre>
+runNIMAutonomousLoop() [runs every 30s]
+    ├── refreshMLPrediction() — gets fresh ML baseline
+    ├── Build context: config + weather + calendar + history + dataset + web cache
+    ├── callNIM() → Claude generates structured prediction
+    └── Parse: ACTION → ALERT | RECOMMEND_RESCUE | SUGGEST_MENU_CHANGE | REQUEST_WEB_UPDATE
+</pre>
+
+<h4>Multi-Model Fallback Chain</h4>
+<pre>
+callTextAI()      → Claude → Gemini → Ollama
+callVisionAI()    → Claude → Gemini → Ollama
+callChatAI()      → Claude → Gemini → Ollama
+generateCafeteriaImage() → Gemini 2.5 flash-image → procedural canvas fallback
+</pre>
+</div>
+
+<!-- npc.js -->
+<h3>3.4 <code>js/npc.js</code> — NPC Simulation (191 lines)</h3>
+<div class="card">
+<p><strong>Classes:</strong></p>
+<ul>
+<li><code>StudentNPC</code> — 5 types (Regular, Vegetarian, Eco, Athlete, Picky) with 8-state lifecycle</li>
+<li><code>ManagerNPC</code> — 3 modes (patrol, phone, idle)</li>
+</ul>
+
+<h4>NPC State Machine:</h4>
+<pre>
+SPAWNING → ENTERING → AT_COUNTER → FINDING_SEAT → EATING → ABANDONING → LEAVING → (repeat)
+                              (queue 5-20 ticks)          (waste prob)    (to bin)
+</pre>
+<p><strong>Important:</strong> NPC waste events are <strong>visual-only</strong>. They increment <code>wasteToday</code> but Claude is explicitly instructed to ignore simulated data. All AI predictions use only the LightGBM model + real weather + calendar.</p>
+</div>
+
+<!-- simulation.js -->
+<h3>3.5 <code>js/simulation.js</code> — Game Engine (170 lines)</h3>
+<div class="card">
+<p><strong>Functions:</strong> <code>initCanvas()</code>, <code>spawnAll()</code>, <code>gameLoop()</code>, <code>drawBackground()</code>, <code>drawZoneOverlays()</code></p>
+<p><strong>Game Loop:</strong> <code>requestAnimationFrame</code> at ~60fps, updates NPCs + manager, draws everything, updates HUD every 60 ticks</p>
+<p><strong>HUD Controls:</strong> Play/Pause toggle, 0.5×/1×/2× speed, student counter, zone overlay toggle, glowing risk LED</p>
+</div>
+
+<!-- ui.js -->
+<h3>3.6 <code>js/ui.js</code> — Desktop OS UI (1,276 lines) ⭐</h3>
+<div class="card">
+<p><strong>40+ functions</strong> organized into:</p>
+<table>
+<tr><th>Category</th><th>Functions</th></tr>
+<tr><td>Boot & Init</td><td><code>initDesktopOS()</code> — main boot: canvas, NPCs, windows, weather, ML, welcome message</td></tr>
+<tr><td>Chat</td><td><code>sendChatMessage()</code>, <code>appendChatMessage()</code>, <code>chatQuickAction()</code>, <code>clearChat()</code>, typing indicator</td></tr>
+<tr><td>Forecast Pipeline</td><td><code>executeAIStructuredForecastFlow()</code> — step-by-step ML→weather→calendar→Claude→prediction paper</td></tr>
+<tr><td>Prediction Paper</td><td><code>showPredictionPaper()</code>, <code>showPredictionPaperAnimated()</code>, <code>approvePredictionPaper()</code></td></tr>
+<tr><td>Widgets</td><td><code>updateWidgets()</code> — GSAP animated counters (efficiency, waste, meals, CO₂)</td></tr>
+<tr><td>Exports</td><td><code>generatePDF()</code>, <code>downloadChatPDF()</code>, <code>downloadWasteCSV()</code>, <code>downloadChatLogs()</code></td></tr>
+<tr><td>Windows</td><td>Agent control, rescue window, weather, simulation, AI logs, waste logs</td></tr>
+<tr><td>GSAP Animations</td><td>Welcome gate reveal, magnetic buttons, window scale transitions, card stack, prediction bar cascade</td></tr>
+</table>
+
+<h4>Chat Flow:</h4>
+<pre>
+sendChatMessage()
+    ├── Local keyword detection (CSV/PDF/report/clear)
+    ├── callClaudeIntent() — intent router
+    ├── FORECAST → executeAIStructuredForecastFlow()
+    │   ├── refreshMLPrediction() → LightGBM
+    │   ├── fetchWeather() → Open-Meteo
+    │   ├── runAgent2() → Claude synthesis
+    │   └── showPredictionPaperAnimated() + generatePDF()
+    ├── SIMULATION_CONTROL → instruction text
+    ├── EXPORT → CSV/PDF/TXT
+    └── CHAT → callChatAI() → response + action buttons
+</pre>
+</div>
+
+<!-- server.py -->
+<h3>3.7 <code>server.py</code> — Proxy Server (244 lines)</h3>
+<div class="card">
+<p><strong>Routes:</strong></p>
+<table>
+<tr><th>Route</th><th>Method</th><th>Proxies To</th></tr>
+<tr><td><code>/</code></td><td>GET</td><td>Static file server (cache-prevention headers)</td></tr>
+<tr><td><code>/proxy/claude</code></td><td>POST</td><td><code>https://api.anthropic.com/v1/messages</code></td></tr>
+<tr><td><code>/proxy/gemini/*</code></td><td>POST</td><td><code>https://generativelanguage.googleapis.com/*</code></td></tr>
+<tr><td><code>/proxy/ml</code></td><td>POST</td><td><code>http://localhost:5000/predict</code></td></tr>
+<tr><td><code>/proxy/ddg</code></td><td>GET</td><td><code>https://api.duckduckgo.com/</code></td></tr>
+</table>
+<p><strong>Key design:</strong> <code>do_<wbr>OPTIONS</code> handles CORS preflight. Error handlers return valid JSON with <code>{"error":"...","detail":"..."}</code>. All prints prefixed with <code>[NIM_PROXY]</code> or <code>[ML_PROXY]</code>.</p>
+</div>
+
+<!-- app.py -->
+<h3>3.8 <code>app.py</code> — ML Server (52 lines)</h3>
+<div class="card">
+<pre>POST /predict { Date, Meal, Canteen_Section, Food_Category }
+    → Parse JSON → Extract date features (Year, Month, Day, DayOfWeek, WeekOfYear)
+    → One-hot encode categoricals → Reorder columns → LightGBM regressor
+    → Return { predicted_waste_kg }</pre>
+<p><strong>Model:</strong> LightGBM trained on 2,600 university canteen records. Features: 6 numerical (Cost, Year, Month, Day, DayOfWeek, WeekOfYear) + one-hot encoded (Meal, Section, Category). Files: <code>lgbm_food_waste_predictor.joblib</code> (280KB), <code>one_hot_encoder.joblib</code> (1.5KB).</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4">4. Data Flow: User Message → AI Response</h2>
+
+<div class="card">
+<h4>Full Pipeline Trace</h4>
+<pre>
+USER: "predict waste for tomorrow"
+  │
+  ▼
+sendChatMessage()                          [ui.js:821]
+  │
+  ├─ Show typing indicator                 [ui.js:805]
+  │
+  ├─ callClaudeIntent()                    [agents.js:58]
+  │   └─ POST /proxy/claude with intent schema
+  │   └─ Returns: { intent: "FORECAST", confidence: 0.95 }
+  │
+  ├─ executeAIStructuredForecastFlow()     [ui.js:465]
+  │   │
+  │   ├─ Step 1 [15%]: refreshMLPrediction()
+  │   │   └─ callLocalML("Lunch", "A", "Meat", today) → 0.56 kg
+  │   │   └─ callLocalML("Lunch", "B", "Meat", today) → 0.72 kg
+  │   │   └─ callLocalML("Lunch", "C", "Meat", today) → 0.48 kg
+  │   │   └─ callLocalML("Lunch", "D", "Meat", today) → 0.31 kg
+  │   │   └─ Total: 2.07 kg stored in lastMLPrediction
+  │   │
+  │   ├─ Step 2 [35%]: fetchWeather()
+  │   │   └─ Open-Meteo: 7-day forecast → weatherForecast[]
+  │   │
+  │   ├─ Step 3 [55%]: getCalendar()
+  │   │   └─ Returns: { type: "exam_week", event: "Exam Week" }
+  │   │
+  │   ├─ Step 4 [70%]: runAgent2()         [agents.js:494]
+  │   │   └─ Build context:
+  │   │       Today's date: Saturday, June 20, 2026
+  │   │       ML_MODEL_PREDICTION: 2.07 kg baseline
+  │   │       7-day forecast, menu, event, hours
+  │   │   └─ callTextAI() → Claude 3.5 Sonnet
+  │   │   └─ Returns structured JSON:
+  │   │       { waste_risk, risk_pct, predicted_waste_kg,
+  │   │         confidence, main_cause, rescue_needed }
+  │   │
+  │   ├─ Step 5 [85%]: Claude narrative
+  │   │   └─ callChatAI() explains forecast
+  │   │
+  │   ├─ showPredictionPaperAnimated()     [ui.js:1080]
+  │   │   └─ GSAP timeline: 5 bars cascade (ML→Weather→Calendar→Menu→AI)
+  │   │
+  │   └─ generatePDF("Waste Forecast", reply)
+  │       └─ Downloads .html file for Print→PDF
+  │
+  └─ appendChatMessage("assistant", reply, ['📥 Download PDF'])
+      └─ Rendered to chat with GSAP fade-in
+</pre>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5">5. All Changes Made (Complete History)</h2>
+
+<div class="card">
+<h4>Phase 1: Foundation</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>1</td><td>Initial scaffold from PRD: single-page app with wizard, desktop OS, chat, simulation</td><td>All files</td></tr>
+<tr><td>2</td><td>Flask ML server + LightGBM model serving <code>/predict</code> endpoint</td><td><code>app.py</code></td></tr>
+<tr><td>3</td><td>Proxy server with CORS handling for NIM, Claude, Gemini, DuckDuckGo, ML</td><td><code>server.py</code></td></tr>
+<tr><td>4</td><td>Weather system: Open-Meteo 7-day forecast with geocoding</td><td><code>data.js:53</code></td></tr>
+</table>
+
+<h4>Phase 2: AI & Simulation</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>5</td><td>Three-agent pipeline (Map→Forecast→Rescue) with Claude/Gemini routing</td><td><code>agents.js</code></td></tr>
+<tr><td>6</td><td>NPC engine: StudentNPC state machine with 5 types, ManagerNPC</td><td><code>npc.js</code></td></tr>
+<tr><td>7</td><td>Canvas game loop with HUD (play/pause, speed, zone overlay, risk LED)</td><td><code>simulation.js</code></td></tr>
+<tr><td>8</td><td>Autonomous NIM loop: 30s AI evaluation cycle with structured responses</td><td><code>agents.js:804</code></td></tr>
+</table>
+
+<h4>Phase 3: Intent Router & Orchestration</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>9</td><td><code>callClaudeIntent()</code> — Claude classifies user messages into FORECAST/CHAT/SIMULATION/DATA_QUERY</td><td><code>agents.js:58</code></td></tr>
+<tr><td>10</td><td>Replaced keyword matching with AI intent routing in <code>sendChatMessage()</code></td><td><code>ui.js:808</code></td></tr>
+<tr><td>11</td><td>Full forecast pipeline with step-by-step progress display</td><td><code>ui.js:465</code></td></tr>
+</table>
+
+<h4>Phase 4: UI & Animation</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>12</td><td>GSAP integration: welcome gate reveal, magnetic hover buttons, window scale transitions, card stack</td><td><code>index.html</code>, <code>ui.js</code></td></tr>
+<tr><td>13</td><td>Prediction paper: animated bar cascade with GSAP timeline (ML→Weather→Calendar→Menu→AI)</td><td><code>ui.js:1080</code></td></tr>
+<tr><td>14</td><td>Widget counters: GSAP value tweening for efficiency, waste reduction, meals saved, CO₂</td><td><code>ui.js:173</code></td></tr>
+<tr><td>15</td><td>Chat UI: typing indicator, Markdown rendering, action button pills, emoji fallback</td><td><code>index.html</code>, <code>ui.js</code></td></tr>
+</table>
+
+<h4>Phase 5: Bug Fixes & Purging Sim Data</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>16</td><td>Removed simulated <code>wasteToday</code> from all AI prompts — Claude only uses real data now</td><td><code>agents.js:539</code>, <code>ui.js:902</code></td></tr>
+<tr><td>17</td><td>Fixed date bug: was showing "17 May 2025" — now passes actual today/tomorrow dates to Claude</td><td><code>agents.js:496</code></td></tr>
+<tr><td>18</td><td>Fixed weather temp: uses forecast high (<code>weatherForecast[0].tempMax</code>) instead of current temp</td><td><code>ui.js:560</code></td></tr>
+<tr><td>19</td><td>Added missing <code>nimObservations</code> to config.js (was crashing game loop)</td><td><code>config.js:70</code></td></tr>
+<tr><td>20</td><td>Bumped all cache-busters to force fresh JS loads</td><td><code>index.html</code></td></tr>
+<tr><td>21</td><td>CSS safety rule: forced visibility for taskbar, folders, chat</td><td><code>index.html</code></td></tr>
+</table>
+
+<h4>Phase 6: PDF Generator & Claude as Full Assistant</h4>
+<table>
+<tr><th>#</th><th>Change</th><th>Files</th></tr>
+<tr><td>22</td><td>General <code>generatePDF(title, markdownContent)</code> — converts any Markdown to styled HTML/PDF</td><td><code>ui.js:769</code></td></tr>
+<tr><td>23</td><td>Claude can now signal PDF generation with <code>[GENERATE_PDF: Title]</code> in responses</td><td><code>ui.js:826</code></td></tr>
+<tr><td>24</td><td>Forecast pipeline auto-generates PDF after each prediction</td><td><code>ui.js:540</code></td></tr>
+<tr><td>25</td><td>Updated buildChatContext so Claude knows it can create PDFs of ANY content</td><td><code>ui.js:945</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6">6. Key Design Decisions</h2>
+
+<div class="card">
+<table>
+<tr><th>Decision</th><th>Rationale</th></tr>
+<tr><td><strong>Proxy architecture for all APIs</strong></td><td>Eliminates CORS issues entirely. Browser talks to same origin (<code>localhost:8080</code>), server forwards to external APIs. Also enables timeout control (180s for NIM, 15s for ML, 10s for DuckDuckGo).</td></tr>
+<tr><td><strong>ML model feeds Claude, doesn't replace it</strong></td><td>LightGBM provides a data-driven baseline (2.07 kg). Claude adjusts for weather (rain → +waste), calendar (exam week → −attendance), menu type, and special events. Final decision is Claude's.</td></tr>
+<tr><td><strong>Simulated data purged from AI context</strong></td><td>NPC waste events are visual-only. Including them in prompts caused Claude to report "126.90kg waste" from simulated NPCs. Claude now receives only: ML baseline + weather + calendar + menu + hours.</td></tr>
+<tr><td><strong>Claude as intent router</strong></td><td>Instead of regex keyword matching, Claude classifies each message into FORECAST/CHAT/SIMULATION_CONTROL/DATA_QUERY with structured JSON output. This makes intent detection context-aware and extensible.</td></tr>
+<tr><td><strong>GSAP for all animations</strong></td><td>Provides consistent, performant animations with spring physics (back.out, elastic.out) and timeline sequencing. Used for welcome gate, window transitions, prediction paper bars, widget counters, and card stack.</td></tr>
+<tr><td><strong>Zero hardcoded data</strong></td><td>HISTORY starts empty. NIM builds everything from live observation + reference dataset. The real dataset (food_waste.json) is reference-only — never merged into session HISTORY.</td></tr>
+<tr><td><strong>Google OAuth graceful degradation</strong></td><td>When no client ID configured, the app shows a link to settings. App is unverified, so only test users work. Calendar sync shows clear error messages (403 → "enable Calendar API").</td></tr>
+<tr><td><strong>Icons have zero-CDN dependency</strong></td><td>If Lucide CDN fails, a fallback script replaces all <code>[data-lucide]</code> elements with emoji from <code>emojiMap</code>. All dynamically created windows use raw emoji instead of Lucide.</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7">7. How to Run & Deploy</h2>
+
+<div class="card">
+<h4>Local Development</h4>
+<pre># Terminal 1: ML API
+python app.py                           # → localhost:5000
+
+# Terminal 2: Web + Proxy Server
+python server.py                        # → localhost:8080
+
+# OR use the convenience script:
+./start.ps1                             # Launches both in hidden windows
+</pre>
+
+<h4>Browser</h4>
+<pre>Open http://localhost:8080
+1. Configure API keys in Settings (or edit api.env)
+2. Fill wizard (4 cards) → upload photo (optional)
+3. Click Continue → desktop boots
+4. Chat with Claude: "predict tomorrow", "create a pdf menu", etc.
+</pre>
+
+<h4>API Keys Required</h4>
+<table>
+<tr><th>Key</th><th>Where</th><th>Purpose</th></tr>
+<tr><td>Claude API Key (Anthropic)</td><td>Settings → Claude</td><td>Primary AI: intent routing, predictions, chat, PDF content</td></tr>
+<tr><td>Gemini API Key (Google)</td><td>Settings → Gemini</td><td>Map generation (image), vision analysis, fallback for chat</td></tr>
+<tr><td>Google Client ID</td><td>Settings → Google</td><td>OAuth sign-in + Calendar sync (optional)</td></tr>
+</table>
+
+<h4>Deployment (Render.com)</h4>
+<pre>1. Push to private GitHub repo
+2. Create Web Service: `python server.py`
+3. Create separate service: `python app.py` (ML API)
+4. Set environment variables in Render dashboard
+5. Update proxy URLs in config.js for production
+</pre>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8">8. Code Quality & Technical Debt</h2>
+
+<div class="card">
+<h4>Strengths</h4>
+<ul>
+<li><strong>Single-file deployment:</strong> No build step, no webpack, no npm — pure HTML+JS+CDNs</li>
+<li><strong>Multi-provider AI resilience:</strong> Claude → Gemini → Ollama cascading fallbacks</li>
+<li><strong>Real ML integration:</strong> LightGBM model with 2,600-record training set</li>
+<li><strong>Comprehensive UX flow:</strong> Welcome gate → 4-card wizard → AI intro → Loading → Desktop OS</li>
+<li><strong>Autonomous operation:</strong> 30-second self-triggered prediction cycle</li>
+<li><strong>Visual polish:</strong> GSAP animations, pixel-art styling, glassmorphism, sprite-based NPCs</li>
+</ul>
+
+<h4>Areas for Improvement</h4>
+<table>
+<tr><th>Issue</th><th>Location</th><th>Impact</th></tr>
+<tr><td>Global state pollution (many <code>window.*</code> properties, no modules)</td><td>All JS files</td><td>Hard to reason about state flow; risk of naming collisions</td></tr>
+<tr><td>Duplicate <code>escapeHtml()</code> in both <code>index.html</code> and <code>ui.js</code></td><td>Line 2394 + ui.js:1050</td><td>Code duplication; one will drift</td></tr>
+<tr><td>Legacy NIM stubs remain in <code>config.js</code></td><td><code>config.js:64-73</code></td><td>Confusing: unused variables suggest NVIDIA is still active</td></tr>
+<tr><td>Large inline scripts in <code>index.html</code> (~700 lines)</td><td><code>index.html</code> inline script</td><td>Hard to maintain; should be extracted to <code>js/</code></td></tr>
+<tr><td>Empty catch blocks</td><td>Multiple locations</td><td>Errors silently swallowed; debugging difficult</td></tr>
+<tr><td>No TypeScript</td><td>All JS files</td><td>No type safety; refactoring risky</td></tr>
+<tr><td>No automated tests</td><td>—</td><td>Regression risk; manual testing only</td></tr>
+</table>
+
+<h4>Code Metrics</h4>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Total JS lines</td><td>3,166</td></tr>
+<tr><td>Total Python lines</td><td>328 (244 server + 52 ML + 32 legacy)</td></tr>
+<tr><td>Total HTML lines (all inline)</td><td>2,468</td></tr>
+<tr><td>Total CSS rules</td><td>~300 custom + Tailwind CDN</td></tr>
+<tr><td>JS functions (all files)</td><td>~80</td></tr>
+<tr><td>JS classes</td><td>2 (StudentNPC, ManagerNPC)</td></tr>
+<tr><td>NPC types</td><td>5 (Regular, Vegetarian, Eco, Athlete, Picky)</td></tr>
+<tr><td>NPCs spawned</td><td>Up to 50</td></tr>
+<tr><td>AI models integrated</td><td>3 (Claude, Gemini, Ollama)</td></tr>
+<tr><td>API proxy endpoints</td><td>4 (Claude, Gemini, ML, DuckDuckGo)</td></tr>
+<tr><td>ML model training records</td><td>2,600+</td></tr>
+<tr><td>Desktop windows</td><td>9 (Simulation, Terminal, Chat, Weather, Calendar, Waste Logs, AI Logs, Menu Editor, Prediction Paper)</td></tr>
+<tr><td>GSAP animations</td><td>12+ (welcome, buttons, windows, cards, prediction paper, widgets)</td></tr>
+</table>
+</div>
+
+<div style="text-align:center;margin:60px 0 40px;color:#94a3b8;font-family:monospace;font-size:12px;border-top:2px solid #e2e8f0;padding-top:24px;">
+CanteenTycoon AI · CMD_CORE · Claude 3.5 Sonnet · LightGBM · Built with ❤️ for the hackathon<br>
+Documentation generated June 20, 2026 · 25 changes across 6 development phases
+</div>
+
+</body>
+</html>

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CanteenTycoon AI - Desktop OS</title>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&amp;family=VT323&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "on-error": "#ffffff",
+                "primary-fixed-dim": "#4edea3",
+                "on-tertiary-fixed-variant": "#653e00",
+                "on-primary-fixed": "#002113",
+                "primary": "#006c49",
+                "inverse-surface": "#283044",
+                "error": "#ba1a1a",
+                "on-secondary-container": "#fffbff",
+                "tertiary-container": "#e29100",
+                "surface": "#faf8ff",
+                "surface-dim": "#d2d9f4",
+                "deep-slate-navy": "#0f172a",
+                "surface-container-low": "#f2f3ff",
+                "on-tertiary-container": "#523200",
+                "on-primary": "#ffffff",
+                "tertiary": "#855300",
+                "background": "#faf8ff",
+                "on-surface": "#131b2e",
+                "on-surface-muted": "#3c4a42",
+                "tertiary-fixed": "#ffddb8",
+                "inverse-primary": "#4edea3",
+                "surface-container": "#eaedff",
+                "on-tertiary": "#ffffff",
+                "on-tertiary-fixed": "#2a1700",
+                "on-primary-fixed-variant": "#005236",
+                "primary-fixed": "#6ffbbe",
+                "inverse-on-surface": "#eef0ff",
+                "surface-container-high": "#e2e7ff",
+                "secondary-fixed": "#ffdad7",
+                "surface-card": "#ffffff",
+                "on-secondary": "#ffffff",
+                "primary-container": "#10b981",
+                "on-secondary-fixed": "#410004",
+                "secondary-container": "#da3437",
+                "tertiary-fixed-dim": "#ffb95f",
+                "surface-variant": "#dae2fd",
+                "surface-bg": "#f1f5f9",
+                "outline-variant": "#bbcabf",
+                "on-error-container": "#93000a",
+                "surface-container-lowest": "#ffffff",
+                "secondary": "#b61722",
+                "on-background": "#131b2e",
+                "error-container": "#ffdad6",
+                "outline": "#6c7a71",
+                "secondary-fixed-dim": "#ffb3ad",
+                "on-surface-main": "#131b2e",
+                "surface-container-highest": "#dae2fd",
+                "on-secondary-fixed-variant": "#930013",
+                "surface-tint": "#006c49",
+                "on-primary-container": "#00422b",
+                "surface-bright": "#faf8ff",
+                "on-surface-variant": "#3c4a42",
+                "brix-folder": "#FFD04D"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "sm": "16px",
+                "shadow-offset": "6px",
+                "xs": "8px",
+                "border-width": "4px",
+                "md": "24px",
+                "lg": "40px"
+              },
+              "fontFamily": {
+                "sans": ["Plus Jakarta Sans", "sans-serif"],
+                "mono": ["VT323", "monospace"]
+              }
+            },
+          },
+        }
+      </script>
+<style>
+        body {
+          background-color: #f1f5f9;
+          background-image: 
+            radial-gradient(#006c49 0.5px, transparent 0.5px), 
+            linear-gradient(to bottom, #f1f5f9, #e2e7ff);
+          background-size: 20px 20px, 100% 100%;
+          height: 100vh;
+          overflow: hidden;
+        }
+
+        .os-window {
+          background: white;
+          border: 4px solid #0f172a;
+          box-shadow: 6px 6px 0px 0px #0f172a;
+          border-radius: 8px;
+        }
+
+        .os-titlebar {
+          background: white;
+          border-bottom: 4px solid #0f172a;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+        }
+
+        .window-button {
+          width: 14px;
+          height: 14px;
+          border: 2px solid #0f172a;
+          border-radius: 2px;
+          cursor: pointer;
+        }
+
+        .folder-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          width: 80px;
+          cursor: pointer;
+          transition: transform 0.1s;
+        }
+
+        .folder-item:hover {
+          transform: scale(1.05);
+        }
+
+        .taskbar {
+          height: 48px;
+          background: white;
+          border-top: 4px solid #0f172a;
+          z-index: 100;
+        }
+
+        .desktop-icon {
+          width: 64px;
+          height: 64px;
+          filter: drop-shadow(2px 2px 0px #0f172a);
+          cursor: pointer;
+        }
+        
+        .widget-card {
+            background: white;
+            border: 4px solid #0f172a;
+            padding: 12px;
+            box-shadow: 4px 4px 0px 0px #0f172a;
+        }
+
+        .os-content::-webkit-scrollbar {
+          width: 8px;
+        }
+        .os-content::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        .os-content::-webkit-scrollbar-thumb {
+          background: #0f172a;
+          border-radius: 4px;
+        }
+
+        .hidden {
+          display: none !important;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 2px solid #0f172a;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #eaedff;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body class="font-sans text-on-surface">
+<!-- Desktop Workspace -->
+<main class="relative w-full h-[calc(100vh-48px)] p-6 overflow-hidden"><div class="os-window absolute top-12 right-12 w-80 z-50 animate-pulse border-secondary" id="win-rescue-alert"><div class="os-titlebar bg-secondary text-white border-secondary"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">warning</span><span class="font-bold text-[10px] uppercase tracking-wider">RESCUE_DISPATCHER</span></div><div class="window-button border-white" onclick="this.closest('.os-window').classList.add('hidden')"></div></div><div class="os-content p-4 bg-secondary/5"><div class="flex items-start gap-3"><div class="bg-secondary text-white p-2 rounded"><span class="material-symbols-outlined">emergency_share</span></div><div><div class="text-[10px] font-bold uppercase text-secondary mb-1">Agent 3: Priority Alpha</div><p class="text-xs font-bold leading-tight">Surplus detected at North Wing. 45kg of pasta requires immediate redirection.</p><button class="mt-3 w-full py-1.5 bg-secondary text-white text-[9px] font-bold uppercase border-2 border-deep-slate-navy shadow-[2px_2px_0px_0px_#0f172a] active:shadow-none">Deploy Rescue</button></div></div></div></div>
+<!-- DESKTOP WIDGETS -->
+<div class="absolute top-8 left-8 flex flex-col gap-6 z-10">
+<div class="widget-card w-48 p-4 rounded-lg border-2">
+<div class="text-[10px] font-bold uppercase opacity-60 flex items-center gap-2 mb-1">
+<svg aria-hidden="true" class="lucide lucide-zap w-3 h-3 text-primary" data-lucide="zap" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>at Efficiency
+            </div>
+<div class="text-3xl font-mono font-bold text-primary">94.2%</div>
+<div class="h-2 bg-deep-slate-navy/10 mt-2 border border-deep-slate-navy">
+<div class="bg-primary h-full" style="width: 94.2%"></div>
+</div>
+</div>
+<div class="widget-card w-48 p-4 rounded-lg border-2">
+<div class="text-[10px] font-bold uppercase opacity-60 flex items-center gap-2 mb-1">
+<svg aria-hidden="true" class="lucide lucide-smile w-3 h-3 text-primary" data-lucide="smile" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg> Mood Index
+            </div>
+<div class="text-2xl font-mono font-bold uppercase text-primary">Optimal</div>
+<p class="text-[8px] mt-1 font-bold">Wait times &lt; 120s</p>
+</div>
+<div class="widget-card w-48 p-4 rounded-lg border-2">
+<div class="text-[10px] font-bold uppercase opacity-60 flex items-center gap-2 mb-1">
+<svg aria-hidden="true" class="lucide lucide-leaf w-3 h-3 text-primary" data-lucide="leaf" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg> Waste Reduction
+            </div>
+<div class="text-2xl font-mono font-bold text-primary">-45.2kg</div>
+<p class="text-[8px] mt-1 font-bold">Today's CO2 Offset</p>
+</div>
+<div class="widget-card w-48 p-4 rounded-lg border-2">
+<div class="text-[10px] font-bold uppercase opacity-60 flex items-center gap-2 mb-1">
+<svg aria-hidden="true" class="lucide lucide-banknote w-3 h-3 text-primary" data-lucide="banknote" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg> Revenue
+            </div>
+<div class="text-2xl font-mono font-bold text-primary">£1,420.50</div>
+<p class="text-[8px] mt-1 font-bold">Shift Performance: +12%</p>
+</div>
+</div>
+<!-- Desktop Icons (Right aligned) -->
+<div class="absolute top-8 right-8 flex flex-col gap-8 items-center z-40">
+<div class="group cursor-pointer flex flex-col items-center" onclick="toggleWindow('win-terminal')">
+<div class="w-16 h-16 bg-deep-slate-navy flex items-center justify-center border-4 border-white shadow-[2px_2px_0px_0px_#0f172a] mb-1">
+<svg aria-hidden="true" class="lucide lucide-terminal w-10 h-10 text-white" data-lucide="terminal" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>
+</div>
+<span class="text-[10px] font-bold bg-deep-slate-navy text-white px-2 py-0.5 rounded-full uppercase">CMD_CORE</span>
+</div>
+<div class="group cursor-pointer flex flex-col items-center" onclick="toggleWindow('win-simulation')"><div class="w-16 h-16 bg-primary flex items-center justify-center border-4 border-white shadow-[2px_2px_0px_0px_#0f172a] mb-1 group-hover:bg-primary-container transition-colors"><svg class="lucide lucide-cpu w-10 h-10 text-white" data-lucide="cpu" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><rect height="16" rx="2" width="16" x="4" y="4"></rect><rect height="6" rx="1" width="6" x="9" y="9"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg></div><span class="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded-full uppercase tracking-wider">SIMULATION</span></div>
+</div>
+<!-- WINDOW: Weather (7-Day Forecast) -->
+<div class="os-window absolute top-12 left-1/2 -translate-x-1/2 w-[450px] z-50 hidden" id="win-weather">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg aria-hidden="true" class="lucide lucide-cloud-sun w-4 h-4 text-primary" data-lucide="cloud-sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="M20 12h2"></path><path d="m19.07 4.93-1.41 1.41"></path><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"></path><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"></path></svg>
+<span class="font-bold text-[10px] uppercase tracking-wider">WEATHER_PRO_v2</span>
+</div>
+<div class="window-button bg-secondary" onclick="toggleWindow('win-weather')"></div>
+</div>
+<div class="os-content p-4">
+<div class="bg-surface-container p-4 border-2 border-deep-slate-navy mb-4 flex items-center justify-between">
+<div>
+<div class="text-3xl font-mono font-bold">12°C</div>
+<div class="text-[10px] font-bold uppercase opacity-60">London, UK - Rainy</div>
+</div>
+<svg aria-hidden="true" class="lucide lucide-cloud-rain w-12 h-12 text-primary" data-lucide="cloud-rain" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M16 14v6"></path><path d="M8 14v6"></path><path d="M12 16v6"></path></svg>
+</div>
+<div class="grid grid-cols-7 gap-1">
+<!-- Forecast Days -->
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">MON</span>
+<svg aria-hidden="true" class="lucide lucide-sun w-4 h-4 my-1" data-lucide="sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+<span class="text-[10px] font-mono">14°</span>
+</div>
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">TUE</span>
+<svg aria-hidden="true" class="lucide lucide-cloud-rain w-4 h-4 my-1" data-lucide="cloud-rain" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M16 14v6"></path><path d="M8 14v6"></path><path d="M12 16v6"></path></svg>
+<span class="text-[10px] font-mono">11°</span>
+</div>
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">WED</span>
+<svg aria-hidden="true" class="lucide lucide-cloud w-4 h-4 my-1" data-lucide="cloud" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+<span class="text-[10px] font-mono">12°</span>
+</div>
+<div class="flex flex-col items-center p-1 border-2 border-primary bg-primary-container/20">
+<span class="text-[8px] font-bold">THU</span>
+<svg aria-hidden="true" class="lucide lucide-cloud-rain w-4 h-4 my-1" data-lucide="cloud-rain" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M16 14v6"></path><path d="M8 14v6"></path><path d="M12 16v6"></path></svg>
+<span class="text-[10px] font-mono">12°</span>
+</div>
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">FRI</span>
+<svg aria-hidden="true" class="lucide lucide-sun w-4 h-4 my-1" data-lucide="sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+<span class="text-[10px] font-mono">15°</span>
+</div>
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">SAT</span>
+<svg aria-hidden="true" class="lucide lucide-cloud-sun w-4 h-4 my-1" data-lucide="cloud-sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="M20 12h2"></path><path d="m19.07 4.93-1.41 1.41"></path><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"></path><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"></path></svg>
+<span class="text-[10px] font-mono">16°</span>
+</div>
+<div class="flex flex-col items-center p-1 border border-deep-slate-navy/20 bg-white">
+<span class="text-[8px] font-bold">SUN</span>
+<svg aria-hidden="true" class="lucide lucide-sun w-4 h-4 my-1" data-lucide="sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+<span class="text-[10px] font-mono">17°</span>
+</div>
+</div>
+<div class="mt-4 p-2 bg-primary/10 border-2 border-primary font-mono text-[9px]">
+                HUMIDITY: 82% | WIND: 12km/h WNW
+            </div>
+</div>
+</div>
+<!-- WINDOW: Interactive Calendar -->
+<div class="os-window absolute top-20 right-20 w-[400px] z-50 hidden" id="win-calendar">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg aria-hidden="true" class="lucide lucide-calendar w-4 h-4" data-lucide="calendar" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect height="18" rx="2" width="18" x="3" y="4"></rect><path d="M3 10h18"></path></svg>
+<span class="font-bold text-[10px] uppercase tracking-wider">SCHEDULER_CORE</span>
+</div>
+<div class="window-button bg-secondary" onclick="toggleWindow('win-calendar')"></div>
+</div>
+<div class="os-content p-4">
+<div class="flex justify-between items-center mb-4">
+<button class="p-1 hover:bg-surface-container"><svg aria-hidden="true" class="lucide lucide-chevron-left w-4 h-4" data-lucide="chevron-left" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="m15 18-6-6 6-6"></path></svg></button>
+<h3 class="font-bold uppercase text-xs">October 2023</h3>
+<button class="p-1 hover:bg-surface-container"><svg aria-hidden="true" class="lucide lucide-chevron-right w-4 h-4" data-lucide="chevron-right" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="m9 18 6-6-6-6"></path></svg></button>
+</div>
+<div class="grid grid-cols-7 gap-px bg-deep-slate-navy border-2 border-deep-slate-navy">
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">S</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">M</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">T</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">W</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">T</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">F</div>
+<div class="bg-surface-container-high p-1 text-[8px] font-bold text-center">S</div>
+<!-- Calendar Days Mockup -->
+<script>
+                    const calDays = Array.from({length: 31}, (_, i) => i + 1);
+                    document.write(calDays.map(d => `
+                        <div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative ${d === 27 ? 'bg-primary-container' : ''}">
+                            ${d}
+                            ${d === 27 ? '<div class="absolute bottom-1 right-1 w-1.5 h-1.5 bg-primary rounded-full"></div>' : ''}
+                        </div>
+                    `).join(''));
+                </script>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            1
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            2
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            3
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            4
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            5
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            6
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            7
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            8
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            9
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            10
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            11
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            12
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            13
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            14
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            15
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            16
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            17
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            18
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            19
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            20
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            21
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            22
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            23
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            24
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            25
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            26
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative bg-primary-container">
+                            27
+                            <div class="absolute bottom-1 right-1 w-1.5 h-1.5 bg-primary rounded-full"></div>
+</div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            28
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            29
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            30
+                            
+                        </div>
+<div class="bg-white p-2 min-h-[40px] text-[10px] font-mono hover:bg-primary-container cursor-pointer transition-colors relative">
+                            31
+                            
+                        </div>
+</div>
+<button class="mt-4 w-full py-2 bg-primary text-white font-bold text-[10px] uppercase border-2 border-deep-slate-navy shadow-[2px_2px_0px_0px_#0f172a] active:shadow-none">
+                + Add System Event
+            </button>
+</div>
+</div>
+<!-- WINDOW: Waste Logs (Spreadsheet Style) -->
+<div class="os-window absolute top-32 left-40 w-[600px] z-50 hidden" id="win-waste-logs">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg aria-hidden="true" class="lucide lucide-file-spreadsheet w-4 h-4" data-lucide="file-spreadsheet" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path><path d="M8 13h2"></path><path d="M14 13h2"></path><path d="M8 17h2"></path><path d="M14 17h2"></path></svg>
+<span class="font-bold text-[10px] uppercase tracking-wider">WASTE_INVENTORY.xls</span>
+</div>
+<div class="window-button bg-secondary" onclick="toggleWindow('win-waste-logs')"></div>
+</div>
+<div class="os-content p-0 overflow-auto max-h-[400px]">
+<table class="font-mono text-[11px]">
+<thead>
+<tr>
+<th class="w-24">Date</th>
+<th class="">Meal Type</th>
+<th class="w-20">Kg</th>
+<th class="w-24">Status</th>
+</tr>
+</thead>
+<tbody>
+<tr><td class="">2023-10-27</td><td class="">Hot Pasta</td><td class="">10.5</td><td class="text-secondary font-bold">EXCESS</td></tr>
+<tr class="bg-surface-container-low"><td class="">2023-10-26</td><td class="">Cold Salad</td><td class="">2.1</td><td class="">OPTIMAL</td></tr>
+<tr><td class="">2023-10-25</td><td class="">Veggie Burger</td><td class="">4.8</td><td class="">WARNING</td></tr>
+<tr class="bg-surface-container-low"><td class="">2023-10-24</td><td class="">Roast Chicken</td><td class="">1.2</td><td class="">OPTIMAL</td></tr>
+<tr><td class="">2023-10-23</td><td class="">Fish &amp; Chips</td><td class="">8.9</td><td class="text-secondary font-bold">EXCESS</td></tr>
+<tr class="bg-surface-container-low"><td class="">2023-10-22</td><td class="">Soup of Day</td><td class="">0.5</td><td class="">OPTIMAL</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- WINDOW: AI Logs (Log Style) -->
+<div class="os-window absolute top-48 left-1/4 w-[600px] z-50 hidden" id="win-ai-logs">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg aria-hidden="true" class="lucide lucide-brain-circuit w-4 h-4" data-lucide="brain-circuit" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M9 13a4.5 4.5 0 0 0 3-4"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M12 13h4"></path><path d="M12 18h6a2 2 0 0 1 2 2v1"></path><path d="M12 8h8"></path><path d="M16 8V5a2 2 0 0 1 2-2"></path><circle cx="16" cy="13" r=".5"></circle><circle cx="18" cy="3" r=".5"></circle><circle cx="20" cy="21" r=".5"></circle><circle cx="20" cy="8" r=".5"></circle></svg>
+<span class="font-bold text-[10px] uppercase tracking-wider">AI_DECISION_LOGS</span>
+</div>
+<div class="window-button bg-secondary" onclick="toggleWindow('win-ai-logs')"></div>
+</div>
+<div class="os-content p-0 overflow-auto max-h-[400px]">
+<table class="font-mono text-[10px]">
+<thead>
+<tr>
+<th class="w-32">Timestamp</th>
+<th class="w-24">Agent</th>
+<th class="">Reasoning</th>
+<th class="w-24">Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="">14:42:01</td>
+<td class="">Byte Chef</td>
+<td class="">Surplus detected in pasta line due to class cancellation.</td>
+<td class="text-primary font-bold">RESCUE_TRIGGER</td>
+</tr>
+<tr class="bg-surface-container-low">
+<td class="">13:15:22</td>
+<td class="">Eco-Flow</td>
+<td class="">Wait time &gt; 180s. Suggesting alternative checkout lane.</td>
+<td class="">SUCCESS</td>
+</tr>
+<tr>
+<td class="">12:30:00</td>
+<td class="">Byte Chef</td>
+<td class="">Cold weather forecast (+4°C drop). Upgrading soup production.</td>
+<td class="">PROACTIVE</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- WINDOW: Terminal App -->
+<div class="os-window absolute bottom-32 right-1/4 w-[500px] z-50 hidden" id="win-terminal">
+<div class="os-titlebar">
+<div class="flex items-center gap-2">
+<svg aria-hidden="true" class="lucide lucide-terminal w-4 h-4" data-lucide="terminal" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>
+<span class="font-bold text-[10px] uppercase tracking-wider">SYSTEM_TERMINAL</span>
+</div>
+<div class="window-button bg-secondary" onclick="toggleWindow('win-terminal')"></div>
+</div>
+<div class="os-content p-4 bg-deep-slate-navy text-primary-fixed-dim font-mono text-xs h-[300px] flex flex-col">
+<div class="flex-1 overflow-y-auto" id="terminal-output">
+                &gt; CanteenTycoon OS [Version 2.0.1]<br/>
+                &gt; (c) 2023 Canteen Intelligence Corp.<br/><br/>
+                &gt; Initializing neural bridges... OK<br/>
+                &gt; System ready. Type 'help' for commands.<br/>
+</div>
+<div class="flex gap-2 mt-2 border-t border-primary/20 pt-2">
+<span class="">&gt;</span>
+<input class="bg-transparent border-none p-0 focus:ring-0 w-full text-xs" placeholder="enter command..." type="text"/>
+</div>
+</div>
+</div><div class="os-window absolute inset-12 z-50 hidden flex flex-col" id="win-simulation"><div class="os-titlebar"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">monitoring</span><span class="font-bold text-[10px] uppercase tracking-wider">SIM_ENGINE_v4.0</span></div><div class="window-button bg-secondary" onclick="toggleWindow('win-simulation')"></div></div><div class="os-content flex-1 bg-deep-slate-navy p-0 overflow-hidden relative"><div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle, #4edea3 1px, transparent 1px); background-size: 30px 30px;"></div><div class="relative h-full flex flex-col p-8"><div class="flex justify-between items-start mb-8"><h2 class="text-primary-fixed-dim text-4xl font-mono uppercase">Active Simulation</h2><div class="text-right font-mono text-primary-fixed-dim"><div class="text-xs">UPTIME: 142:12:05</div><div class="text-xs">LOAD: 42.8%</div></div></div><div class="flex-1 border-2 border-primary-fixed-dim/30 rounded p-4 flex items-center justify-center"><div class="text-primary-fixed-dim font-mono text-center animate-pulse"><div class="text-6xl mb-4">[ RUNNING ]</div><div class="text-sm">NEURAL_BRIDGE_STABLE</div></div></div></div></div></div>
+<!-- FOLDER GRID (Bottom Left) -->
+<div class="absolute bottom-16 left-6 flex gap-8">
+<div class="folder-item group" onclick="toggleWindow('win-ai-logs')">
+<div class="relative">
+<svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<svg aria-hidden="true" class="lucide lucide-brain-circuit absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40" data-lucide="brain-circuit" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M9 13a4.5 4.5 0 0 0 3-4"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M12 13h4"></path><path d="M12 18h6a2 2 0 0 1 2 2v1"></path><path d="M12 8h8"></path><path d="M16 8V5a2 2 0 0 1 2-2"></path><circle cx="16" cy="13" r=".5"></circle><circle cx="18" cy="3" r=".5"></circle><circle cx="20" cy="21" r=".5"></circle><circle cx="20" cy="8" r=".5"></circle></svg>
+</div>
+<span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">AI_LOGS</span>
+</div>
+<div class="folder-item" onclick="toggleWindow('win-waste-logs')">
+<div class="relative">
+<svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<svg aria-hidden="true" class="lucide lucide-file-spreadsheet absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40" data-lucide="file-spreadsheet" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path><path d="M8 13h2"></path><path d="M14 13h2"></path><path d="M8 17h2"></path><path d="M14 17h2"></path></svg>
+</div>
+<span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">WASTE_LOGS</span>
+</div>
+<div class="folder-item" onclick="toggleWindow('win-weather')">
+<div class="relative">
+<svg class="w-12 h-12 text-brix-folder" fill="currentColor" viewbox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+<svg aria-hidden="true" class="lucide lucide-cloud-sun absolute inset-0 m-auto w-4 h-4 text-deep-slate-navy/40" data-lucide="cloud-sun" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="M20 12h2"></path><path d="m19.07 4.93-1.41 1.41"></path><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"></path><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"></path></svg>
+</div>
+<span class="font-bold text-[9px] font-mono tracking-tight text-on-surface-main text-center">WEATHER</span>
+</div>
+</div>
+</main>
+<!-- TASKBAR / DOCK -->
+<nav class="taskbar fixed bottom-0 left-0 w-full flex items-center px-4 justify-between">
+<div class="flex items-center gap-4 h-full">
+<button class="bg-deep-slate-navy text-white px-4 h-8 flex items-center gap-2 font-bold text-xs uppercase border-2 border-white shadow-[2px_2px_0px_0px_#0f172a] rounded-md hover:bg-primary transition-all">
+<div class="w-3 h-3 bg-primary-fixed-dim rounded-sm"></div>
+            System
+        </button>
+<div class="h-6 w-px bg-deep-slate-navy opacity-20"></div>
+<div class="flex gap-2">
+<div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center justify-center" onclick="toggleWindow('win-terminal')">
+<svg aria-hidden="true" class="lucide lucide-terminal w-4 h-4" data-lucide="terminal" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>
+</div>
+<div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center justify-center">
+<svg aria-hidden="true" class="lucide lucide-folder w-4 h-4" data-lucide="folder" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-2 text-[10px] font-mono font-bold uppercase">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            ACTIVE_RESCUE_RADAR
+        </div>
+<div class="flex flex-col items-end leading-none cursor-pointer hover:bg-surface-container-low px-2 py-1 rounded transition-colors border-l border-deep-slate-navy/10 pl-4" onclick="toggleWindow('win-calendar')">
+<span class="text-xs font-bold font-mono" id="taskbar-time">11:43:28</span>
+<span class="text-[8px] font-bold opacity-50 uppercase tracking-tighter">27 OCT 2023</span>
+</div>
+</div>
+</nav>
+<script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    function toggleWindow(id) {
+        const win = document.getElementById(id);
+        if (!win) return;
+        
+        if (win.classList.contains('hidden')) {
+            // Close all first if we wanted a single-tasking feel, 
+            // but for Desktop OS we just show and bring to front
+            win.classList.remove('hidden');
+            
+            // Bring to front logic
+            const windows = document.querySelectorAll('.os-window');
+            windows.forEach(w => w.style.zIndex = "40");
+            win.style.zIndex = "60";
+        } else {
+            win.classList.add('hidden');
+        }
+    }
+
+    // Keep clock updated
+    setInterval(() => {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0];
+        const clockEl = document.getElementById('taskbar-time');
+        if(clockEl) clockEl.textContent = timeStr;
+    }, 1000);
+
+    // Initial State - maybe keep everything closed for a clean start or open one
+    window.onload = () => {
+        // toggleWindow('win-terminal'); // Optional: open terminal on load
+    }
+</script>
+</body></html>

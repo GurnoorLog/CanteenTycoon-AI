@@ -1,0 +1,13 @@
+# API keys — never commit real keys
+api.env
+
+# Kaggle cache
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
