@@ -776,32 +776,8 @@ async function confirmSendEmail() {
   if (!to) { terminalLog('EMAIL: No recipient email address', 'err'); return; }
   const fromEmail = setupConfig?.googleUser?.email || setupConfig?.managerContact || '';
 
-  // Use pre-fetched Google token (from wizard sign-in) or request one
+  // Use pre-fetched Google token only (granted during sign-in in wizard)
   let accessToken = window.__googleAccessToken || '';
-  if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
-    try {
-      const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-      if (cid) {
-        const getToken = (prompt) => new Promise((res, rej) => {
-          try {
-            const tc = google.accounts.oauth2.initTokenClient({
-              client_id: cid,
-              scope: 'https://mail.google.com/',
-              prompt,
-              callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
-            });
-            if (prompt === 'consent') sendNotification('⏳ Gmail Permission', 'A Google popup will ask you to grant email sending permission.', 'high');
-            tc.requestAccessToken();
-          } catch(e) { rej(e.message); }
-        });
-        try { accessToken = await getToken(''); }
-        catch(e) {
-          terminalLog('[Google] Silent Gmail token failed, requesting consent...', 'warn');
-          accessToken = await getToken('consent');
-        }
-      }
-    } catch(e) { terminalLog('[Google] Gmail token: ' + e, 'warn'); }
-  }
 
   closeEmailApproval();
 

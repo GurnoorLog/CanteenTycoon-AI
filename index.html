@@ -1910,11 +1910,12 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         document.getElementById('gsi-error').classList.add('hidden');
         console.log('[Google] Signed in as', payload.email, '| Gmail+Calendar:', !!response.access_token);
 
-        // Restore previous setup config for this user
+        // Restore previous setup config for this user (preserve googleUser)
         const savedConfig = localStorage.getItem('ct_setup_config_' + payload.email);
         if (savedConfig) {
             try {
                 const parsed = JSON.parse(savedConfig);
+                parsed.googleUser = payload; // keep current sign-in identity
                 Object.assign(setupConfig, parsed);
                 const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
                 fill('input-canteen', parsed.canteenName);
@@ -1968,6 +1969,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             if (savedConfig) {
                 try {
                     const parsed = JSON.parse(savedConfig);
+                    parsed.googleUser = user; // keep current sign-in identity
                     Object.assign(setupConfig, parsed);
                     const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
                     fill('input-canteen', parsed.canteenName);
@@ -2473,31 +2475,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function syncToGoogleCalendar(date, title) {
-        // Use pre-fetched Google token (from wizard sign-in) or request one
+        // Use pre-fetched Google token only (granted during sign-in in wizard)
         let accessToken = window.__googleAccessToken || '';
-        if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
-            try {
-                const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-                if (cid) {
-                    const getToken = (prompt) => new Promise((res, rej) => {
-                        try {
-                            const tc = google.accounts.oauth2.initTokenClient({
-                                client_id: cid,
-                                scope: GOOGLE_CALENDAR_SCOPE,
-                                prompt,
-                                callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
-                            });
-                            if (prompt === 'consent' && typeof sendNotification === 'function') {
-                                sendNotification('⏳ Calendar Permission', 'A Google popup will ask you to grant calendar permission.', 'high');
-                            }
-                            tc.requestAccessToken();
-                        } catch(e) { rej(e.message); }
-                    });
-                    try { accessToken = await getToken(''); }
-                    catch(e) { accessToken = await getToken('consent'); }
-                }
-            } catch(e) { /* silent fail — server may have its own token */ }
-        }
         // Try direct Calendar API first, fall back to proxy
         let synced = false;
         if (accessToken) {
@@ -2529,29 +2508,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function fetchFromGoogleCalendar(silent) {
-        // Use pre-fetched Google token (from wizard sign-in) or request one
+        // Use pre-fetched Google token only (granted during sign-in in wizard)
         let accessToken = window.__googleAccessToken || '';
-        if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
-            try {
-                const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-                if (cid) {
-                    const token = await new Promise((res, rej) => {
-                        try {
-                            const tc = google.accounts.oauth2.initTokenClient({
-                                client_id: cid,
-                                scope: GOOGLE_CALENDAR_SCOPE,
-                                prompt: silent ? '' : 'consent',
-                                callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
-                            });
-                            tc.requestAccessToken();
-                        } catch(e) { rej(e.message); }
-                    });
-                    accessToken = token;
-                }
-            } catch(e) {
-                if (silent) { /* retry handled silently */ }
-            }
-        }
         // Try direct Calendar API first, then proxy
         let items = [];
         if (accessToken) {
