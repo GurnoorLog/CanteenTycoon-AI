@@ -776,9 +776,9 @@ async function confirmSendEmail() {
   if (!to) { terminalLog('EMAIL: No recipient email address', 'err'); return; }
   const fromEmail = setupConfig?.googleUser?.email || setupConfig?.managerContact || '';
 
-  // Try to get a Gmail access token if signed in
-  let accessToken = '';
-  if (setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
+  // Use pre-fetched Google token (from wizard sign-in) or request one
+  let accessToken = window.__googleAccessToken || '';
+  if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
     try {
       const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
       if (cid) {
@@ -794,7 +794,6 @@ async function confirmSendEmail() {
             tc.requestAccessToken();
           } catch(e) { rej(e.message); }
         });
-        // Try silent first, then consent
         try { accessToken = await getToken(''); }
         catch(e) {
           terminalLog('[Google] Silent Gmail token failed, requesting consent...', 'warn');

@@ -1864,6 +1864,35 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         }
     }
 
+    // ── Google permissions store ──────────────────────────────────
+    window.__googleAccessToken = '';
+
+    async function requestGooglePermissions() {
+        const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+        if (!cid || !setupConfig?.googleUser || typeof google === 'undefined' || !google.accounts?.oauth2) return;
+        try {
+            const token = await new Promise((res, rej) => {
+                try {
+                    const tc = google.accounts.oauth2.initTokenClient({
+                        client_id: cid,
+                        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events',
+                        prompt: 'consent',
+                        callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
+                    });
+                    if (typeof sendNotification === 'function') {
+                        sendNotification('🔑 Google Permissions', 'One popup will ask for Gmail + Calendar access.', 'high');
+                    }
+                    tc.requestAccessToken();
+                } catch(e) { rej(e.message); }
+            });
+            window.__googleAccessToken = token;
+            console.log('[Google] Gmail + Calendar permissions granted ✓');
+            if (typeof terminalLog === 'function') terminalLog('[Google] Gmail + Calendar tokens ready', 'ok');
+        } catch(e) {
+            console.warn('[Google] Permission request failed:', e);
+        }
+    }
+
     // ============================================================
     // GOOGLE SIGN-IN
     // ============================================================
@@ -1919,6 +1948,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             setTimeout(() => {
                 if (typeof fetchFromGoogleCalendar === 'function') fetchFromGoogleCalendar(true);
             }, 1000);
+
+            // Request Gmail + Calendar permissions immediately after sign-in
+            setTimeout(requestGooglePermissions, 2000);
         } catch(e) {
             console.warn('[Google] Token parse failed', e);
         }
@@ -1965,6 +1997,18 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             if (setupConfig.wizardComplete) {
                 setTimeout(skipToDesktop, 500);
             }
+            // Request Gmail + Calendar permissions silently (no popup if already granted)
+            setTimeout(() => {
+                const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+                if (cid && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
+                    google.accounts.oauth2.initTokenClient({
+                        client_id: cid,
+                        scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events',
+                        prompt: '',
+                        callback: (r) => { if (r.access_token) window.__googleAccessToken = r.access_token; }
+                    }).requestAccessToken();
+                }
+            }, 2000);
             console.log('[Google] Restored session for', user.email);
         } catch(e) { console.warn('[Google] Session restore failed', e); }
     }
@@ -2480,9 +2524,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function syncToGoogleCalendar(date, title) {
-        // Try to get a Calendar access token if signed in
-        let accessToken = '';
-        if (setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
+        // Use pre-fetched Google token (from wizard sign-in) or request one
+        let accessToken = window.__googleAccessToken || '';
+        if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
             try {
                 const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
                 if (cid) {
@@ -2525,9 +2569,9 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     }
 
     async function fetchFromGoogleCalendar(silent) {
-        // Try to get a Calendar access token if signed in
-        let accessToken = '';
-        if (setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
+        // Use pre-fetched Google token (from wizard sign-in) or request one
+        let accessToken = window.__googleAccessToken || '';
+        if (!accessToken && setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
             try {
                 const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
                 if (cid) {
