@@ -559,7 +559,15 @@ async function executeAIStructuredForecastFlow(options = {}) {
 In 2-3 sentences, explain why you predict this amount for ${targetStr} (NOT today unless target is today). Cite weather, calendar, and menu for that specific date. Tell the manager to review the Forecast Report and click Approve if they agree.
 Optionally, you can update the dashboard widgets based on this forecast by adding:
 [WIDGETS: {"efficiency":${Math.round(100 - pred.risk_pct)},"mood":"${pred.waste_risk === 'high' ? 'Attention' : pred.waste_risk === 'medium' ? 'Stable' : 'Optimal'}","wasteReduction":${(pred.predicted_waste_kg * 0.3).toFixed(1)},"co2Saved":${pred.co2_at_risk_kg},"mealsDonated":${Math.round(pred.predicted_waste_kg * 3.33 * 0.3)},"moodDetail":"${pred.main_cause.substring(0, 60)}"}]`;
-    const reply = await callChatAI(explanationContext, [{ role: 'user', content: `Explain the forecast for ${targetStr}.` }]);
+    let reply = await callChatAI(explanationContext, [{ role: 'user', content: `Explain the forecast for ${targetStr}.` }]);
+    // Extract WIDGETS tag from explanation (don't use full processClaudeActions — would loop on [RUN_FORECAST])
+    const wm = reply.match(/\[WIDGETS:\s*(\{[\s\S]+?\})\]/);
+    if (wm) {
+      try { applyWidgetOverrides(JSON.parse(wm[1])); } catch(e) { terminalLog(`WIDGETS: ${e.message}`, 'warn'); }
+      reply = reply.replace(/\[WIDGETS:\s*\{[\s\S]+?\}\]/, '').trim();
+    }
+    // Also strip any other tags that might have been included
+    reply = reply.replace(/\[(GENERATE_PDF|EXPORT_CSV|DAILY_REPORT|CLEAR_CHAT|WEB_SEARCH|SEND_EMAIL|SAVE_MEMORY|TRAIN_MODEL)[^\]]*\]/gi, '').trim();
 
     setStep('✅ Forecast complete! Report ready.', 100);
     await new Promise(r => setTimeout(r, 600));
@@ -766,6 +774,29 @@ async function confirmSendEmail() {
   const subject = document.getElementById('email-approval-subject').value.trim();
   const body = document.getElementById('email-approval-body').value.trim();
   if (!to) { terminalLog('EMAIL: No recipient email address', 'err'); return; }
+  const fromEmail = setupConfig?.googleUser?.email || setupConfig?.managerContact || '';
+
+  // Try to get a Gmail access token if signed in
+  let accessToken = '';
+  if (setupConfig?.googleUser && typeof google !== 'undefined' && google.accounts?.oauth2) {
+    try {
+      const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+      if (cid) {
+        const token = await new Promise((res, rej) => {
+          try {
+            const tc = google.accounts.oauth2.initTokenClient({
+              client_id: cid,
+              scope: 'https://www.googleapis.com/auth/gmail.send',
+              prompt: '',
+              callback: (r) => r.access_token ? res(r.access_token) : rej(r.error || 'no token')
+            });
+            tc.requestAccessToken();
+          } catch(e) { rej(e.message); }
+        });
+        accessToken = token;
+      }
+    } catch(e) { terminalLog('[Google] Gmail token: ' + e, 'warn'); }
+  }
 
   closeEmailApproval();
 
@@ -775,10 +806,12 @@ async function confirmSendEmail() {
 
   // Send the email
   try {
+    const payload = { to, subject, body, from_email: fromEmail };
+    if (accessToken) payload.access_token = accessToken;
     const res = await fetch('/proxy/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, body })
+      body: JSON.stringify(payload)
     });
     const result = await res.json();
     if (result.sent) {

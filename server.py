@@ -5,7 +5,7 @@ import os, json, smtplib, logging, base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Try to load Google API client (optional — falls back to SMTP or simulation)
+# Try to load Google API client (optional — falls back gracefully)
 try:
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -13,6 +13,18 @@ try:
     GOOGLE_API_AVAILABLE = True
 except ImportError:
     GOOGLE_API_AVAILABLE = False
+
+# Try to load OAuth flow helper for setup endpoint
+try:
+    import google_auth_oauthlib.flow
+    GOOGLE_AUTH_FLOW_AVAILABLE = True
+except ImportError:
+    GOOGLE_AUTH_FLOW_AVAILABLE = False
+
+GMAIL_CALENDAR_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/calendar.events",
+]
 
 # Build a Google Calendar API service using the same OAuth2 refresh token
 def _calendar_service():
@@ -57,6 +69,87 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def _serve_google_setup_page(self):
+        cid = os.environ.get("GOOGLE_CLIENT_ID", "")
+        cs = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        if not cid or not cs:
+            html = """<html><body><h1>Google OAuth Setup</h1>
+<p style="color:red">GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set on server.</p>
+<p>Add them to your Render environment variables, then reload this page.</p></body></html>"""
+        elif not GOOGLE_AUTH_FLOW_AVAILABLE:
+            html = """<html><body><h1>Google OAuth Setup</h1>
+<p style="color:red">google_auth_oauthlib not installed. Run: pip install google-auth-oauthlib</p></body></html>"""
+        else:
+            host = self.headers.get("Host", "localhost:8080")
+            scheme = "https" if "onrender.com" in host else "http"
+            redirect_uri = f"{scheme}://{host}/oauth2callback"
+            flow = google_auth_oauthlib.flow.Flow.from_client_config(
+                {"web": {"client_id": cid, "client_secret": cs,
+                         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                         "token_uri": "https://oauth2.googleapis.com/token",
+                         "redirect_uris": [redirect_uri]}},
+                scopes=GMAIL_CALENDAR_SCOPES)
+            flow.redirect_uri = redirect_uri
+            auth_url, _ = flow.authorization_url(
+                access_type="offline", include_granted_scopes="true",
+                prompt="consent")
+            html = f"""<html><body><h1>Google OAuth Setup</h1>
+<p>This will generate a <code>GOOGLE_REFRESH_TOKEN</code> with both scopes:</p>
+<ul><li>gmail.send</li><li>calendar.events</li></ul>
+<p>Step 1: Make sure this exact redirect URI is in your Google Cloud Console:</p>
+<pre>{redirect_uri}</pre>
+<p>Step 2: <a href="{auth_url}" style="font-size:1.2em;font-weight:bold">🔑 Click here to authorize with Google</a></p>
+<p>Step 3: Copy the refresh token shown after authorization and paste it into your <b>Render</b> environment variables as <code>GOOGLE_REFRESH_TOKEN</code>.</p>
+<p>Step 4: Restart your Render service.</p>
+<hr><small>Redirect URI: {redirect_uri}</small></body></html>"""
+        body = html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _handle_oauth2_callback(self):
+        cid = os.environ.get("GOOGLE_CLIENT_ID", "")
+        cs = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        if not cid or not cs or not GOOGLE_AUTH_FLOW_AVAILABLE:
+            html = "<html><body><h1>Error</h1><p>Google credentials not configured.</p></body></html>"
+        else:
+            host = self.headers.get("Host", "localhost:8080")
+            scheme = "https" if "onrender.com" in host else "http"
+            redirect_uri = f"{scheme}://{host}/oauth2callback"
+            try:
+                parsed = urllib.parse.urlparse(self.path)
+                params = urllib.parse.parse_qs(parsed.query)
+                code = params.get("code", [None])[0]
+                if not code:
+                    html = "<html><body><h1>Error</h1><p>No authorization code received.</p></body></html>"
+                else:
+                    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+                        {"web": {"client_id": cid, "client_secret": cs,
+                                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                                 "token_uri": "https://oauth2.googleapis.com/token",
+                                 "redirect_uris": [redirect_uri]}},
+                        scopes=GMAIL_CALENDAR_SCOPES)
+                    flow.redirect_uri = redirect_uri
+                    flow.fetch_token(code=code)
+                    rt = flow.credentials.refresh_token
+                    html = f"""<html><body><h1>✅ Success!</h1>
+<p>Copy this refresh token and add it to your Render environment as <code>GOOGLE_REFRESH_TOKEN</code>:</p>
+<textarea rows="3" cols="80" readonly style="font-size:1.1em;width:100%"
+onclick="this.select()">{rt}</textarea>
+<p style="color:green">Also set <code>FROM_EMAIL</code> to your sender address in Render env vars.</p>
+<p>After adding both, restart your Render service. Gmail and Calendar will work immediately.</p>
+<hr><small>Scopes: gmail.send, calendar.events</small></body></html>"""
+            except Exception as e:
+                html = f"<html><body><h1>Error</h1><p>{e}</p></body></html>"
+        body = html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         # Serve Google Client ID via API (not in HTML source)
         if self.path == "/proxy/google-client-id":
@@ -94,6 +187,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
             return
+
+        if self.path == "/setup-google-auth":
+            self._serve_google_setup_page()
+            return
+
+        if self.path.startswith("/oauth2callback"):
+            self._handle_oauth2_callback()
+            return
+
         super().do_GET()
 
     def do_POST(self):
@@ -260,49 +362,58 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
         if self.path == "/proxy/send-email":
             length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length))
-            to_addr = body.get("to", "")
-            subject = body.get("subject", "CanteenTycoon AI Dispatch")
-            text = body.get("body", "")
-            from_addr = os.environ.get("FROM_EMAIL", "noreply@canteentycoon.com")
+            req_data = json.loads(self.rfile.read(length))
+            to_addr = req_data.get("to", "")
+            subject = req_data.get("subject", "CanteenTycoon AI Dispatch")
+            text = req_data.get("body", "")
+            from_addr = req_data.get("from_email") or os.environ.get("FROM_EMAIL", "noreply@canteentycoon.com")
+            client_token = req_data.get("access_token", "")
+            server_rt = os.environ.get("GOOGLE_REFRESH_TOKEN", "")
             resp = {"sent": False, "to": to_addr}
 
-            # Try Gmail API first (OAuth2 with refresh token)
-            gmail_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-            gmail_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-            gmail_refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN", "")
-            if GOOGLE_API_AVAILABLE and gmail_client_id and gmail_client_secret and gmail_refresh_token:
+            # Try Gmail API with available auth: server refresh token > client token > SMTP > simulate
+            gmail_sent = False
+            gmail_err = None
+
+            # 1. Server-side refresh token (no client involvement)
+            if GOOGLE_API_AVAILABLE and os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET") and server_rt:
                 try:
-                    creds = Credentials(
-                        None,
-                        refresh_token=gmail_refresh_token,
+                    creds = Credentials(None, refresh_token=server_rt,
                         token_uri="https://oauth2.googleapis.com/token",
-                        client_id=gmail_client_id,
-                        client_secret=gmail_client_secret,
-                    )
-                    # Auto-refresh if expired
+                        client_id=os.environ["GOOGLE_CLIENT_ID"],
+                        client_secret=os.environ["GOOGLE_CLIENT_SECRET"])
                     creds.refresh(Request())
                     service = build("gmail", "v1", credentials=creds, cache_discovery=False)
-
-                    # Build RFC 2822 email
                     mime = MIMEMultipart("alternative")
-                    mime["Subject"] = subject
-                    mime["From"] = from_addr
-                    mime["To"] = to_addr
+                    mime["Subject"] = subject; mime["From"] = from_addr; mime["To"] = to_addr
                     mime.attach(MIMEText(text, "plain", "utf-8"))
                     raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
-
                     sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
                     resp = {"sent": True, "to": to_addr, "gmail_id": sent.get("id")}
-                    print(f"[EMAIL] Sent via Gmail API to {to_addr}: {subject} (ID: {sent.get('id')})", flush=True)
+                    print(f"[EMAIL] Sent via Gmail (server) to {to_addr}: {subject}", flush=True)
+                    gmail_sent = True
                 except Exception as e:
-                    err_msg = str(e)
-                    print(f"[EMAIL] Gmail API failed for {to_addr}: {err_msg}", flush=True)
-                    # Fall through to SMTP below
-                    resp = {"sent": False, "error": f"Gmail API: {err_msg}"}
+                    gmail_err = str(e)
+                    print(f"[EMAIL] Gmail server-auth failed: {gmail_err}", flush=True)
 
-            # SMTP fallback (if Gmail API wasn't used or failed)
-            if not resp.get("sent"):
+            # 2. Client-provided access token (browser OAuth)
+            if not gmail_sent and client_token and GOOGLE_API_AVAILABLE:
+                try:
+                    creds = Credentials(client_token)
+                    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+                    mime = MIMEMultipart("alternative")
+                    mime["Subject"] = subject; mime["From"] = from_addr; mime["To"] = to_addr
+                    mime.attach(MIMEText(text, "plain", "utf-8"))
+                    raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
+                    sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+                    resp = {"sent": True, "to": to_addr, "gmail_id": sent.get("id")}
+                    print(f"[EMAIL] Sent via Gmail (client-token) to {to_addr}: {subject}", flush=True)
+                    gmail_sent = True
+                except Exception as e:
+                    print(f"[EMAIL] Gmail client-token failed: {e}", flush=True)
+
+            # 3. SMTP fallback
+            if not gmail_sent:
                 smtp_host = os.environ.get("SMTP_HOST", "")
                 smtp_port = int(os.environ.get("SMTP_PORT", 587))
                 smtp_user = os.environ.get("SMTP_USER", "")
@@ -310,21 +421,18 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 if smtp_host and smtp_user:
                     try:
                         msg = MIMEText(text, "plain", "utf-8")
-                        msg["Subject"] = subject
-                        msg["From"] = from_addr
-                        msg["To"] = to_addr
+                        msg["Subject"] = subject; msg["From"] = from_addr; msg["To"] = to_addr
                         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
-                            s.starttls()
-                            s.login(smtp_user, smtp_pass)
-                            s.send_message(msg)
+                            s.starttls(); s.login(smtp_user, smtp_pass); s.send_message(msg)
                         resp = {"sent": True, "to": to_addr}
                         print(f"[EMAIL] Sent via SMTP to {to_addr}: {subject}", flush=True)
                     except Exception as e:
                         resp = {"sent": False, "error": str(e)}
-                        print(f"[EMAIL] SMTP failed to {to_addr}: {e}", flush=True)
+                        print(f"[EMAIL] SMTP failed: {e}", flush=True)
                 else:
-                    resp = {"sent": True, "simulated": True, "to": to_addr, "note": "No email provider configured, email simulated"}
-                    print(f"[EMAIL] Simulated send to {to_addr}: {subject}", flush=True)
+                    resp = {"sent": True, "simulated": True, "to": to_addr,
+                            "note": "No email configured — simulated. Set GOOGLE_REFRESH_TOKEN on Render to send real emails."}
+                    print(f"[EMAIL] Simulated to {to_addr}: {subject}", flush=True)
 
             body_resp = json.dumps(resp).encode()
             self.send_response(200)
@@ -339,8 +447,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             req_body = json.loads(self.rfile.read(length))
             action = req_body.get("action", "")
+            client_token = req_body.get("access_token", "")
+            resp = {"ok": False, "error": "No auth available"}
+
+            # Try server-side refresh token first, then client token
             cal = _calendar_service()
-            resp = {"ok": False, "error": "Calendar API not configured or Google API not available"}
+            if not cal and client_token and GOOGLE_API_AVAILABLE:
+                try:
+                    cal = build("calendar", "v3",
+                        credentials=Credentials(client_token), cache_discovery=False)
+                except Exception as e:
+                    print(f"[CALENDAR] Client-token build failed: {e}", flush=True)
 
             if cal:
                 try:
@@ -352,7 +469,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                         }
                         created = cal.events().insert(calendarId="primary", body=event).execute()
                         resp = {"ok": True, "id": created.get("id"), "htmlLink": created.get("htmlLink")}
-                        print(f"[CALENDAR] Created event: {req_body.get('title')} on {req_body.get('date')}", flush=True)
+                        print(f"[CALENDAR] Created: {req_body.get('title')} on {req_body.get('date')}", flush=True)
 
                     elif action == "list":
                         now = __import__("datetime").datetime.utcnow()
