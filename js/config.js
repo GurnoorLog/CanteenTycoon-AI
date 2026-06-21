@@ -61,6 +61,7 @@ let hasPredictionForToday = false;
 // Simulation day override — "skip to predicted day"
 let simulatingPredictedDay = false;   // when true, openOrClosed() returns OPEN
 let simulatedDayLabel = '';          // e.g. "Monday" — shown on canvas HUD
+let simulatedDate = null;            // Date obj for day being simulated (null = real time)
 
 let currentDraft      = null;
 

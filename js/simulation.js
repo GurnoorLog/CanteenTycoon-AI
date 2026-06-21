@@ -52,7 +52,14 @@ function initCanvas(){
   hud.className = 'sim-hud flex items-center justify-between px-4 py-2 bg-slate-900 border-t-2 border-slate-700 font-mono text-[10px] text-slate-300';
   hud.style.cssText = 'height:36px;flex-shrink:0;z-index:10;';
   hud.innerHTML = `
-    <!-- Left: Play/Pause & Speed -->
+    <!-- Left: Date Navigation -->
+    <div class="flex items-center gap-1">
+      <button onclick="navigateSimDay(-1)" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded active:scale-95 transition-all cursor-pointer text-[10px] leading-none" title="Previous day">◀</button>
+      <span id="sim-date-display" class="font-bold text-white text-[10px] min-w-[100px] text-center cursor-pointer" onclick="jumpToSimDate()" title="Click to pick a date">--</span>
+      <button onclick="navigateSimDay(1)" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded active:scale-95 transition-all cursor-pointer text-[10px] leading-none" title="Next day">▶</button>
+    </div>
+
+    <!-- Play/Pause & Speed -->
     <div class="flex items-center gap-3">
       <button id="sim-play-pause-btn" onclick="toggleSimPlayPause()" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-emerald-400 font-bold uppercase rounded active:scale-95 transition-all cursor-pointer text-[9px]">
         ⏸ PAUSE
@@ -212,6 +219,14 @@ function gameLoop(){
       } else {
         simIndicator.classList.add('hidden');
       }
+    }
+
+    // Update date display in toolbar
+    const dateDisplay = document.getElementById('sim-date-display');
+    if (dateDisplay) {
+      const d = simulatedDate || new Date();
+      const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+      dateDisplay.textContent = d.toLocaleDateString('en-US', opts);
     }
 
     // Status overlays

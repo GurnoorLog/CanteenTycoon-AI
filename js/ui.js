@@ -1919,6 +1919,13 @@ function startSimulatedDay() {
   simulatedDayLabel = dayName;
   hasPredictionForToday = true; // forecast flow sets currentPrediction but not this flag
 
+  // Sync simulatedDate from currentPrediction if available
+  if (!simulatedDate && currentPrediction?.date) {
+    simulatedDate = new Date(currentPrediction.date + 'T12:00:00');
+  } else if (!simulatedDate) {
+    simulatedDate = new Date();
+  }
+
   // Apply NPC risk scaling from this prediction
   if (window.students && students.length > 0) {
     const multipliers = { low: 1.0, medium: 1.3, high: 1.6 };
@@ -1964,3 +1971,96 @@ function stopSimulatedDay() {
   // If canteen is now closed, the gameLoop will show the closed overlay automatically
 }
 window.stopSimulatedDay = stopSimulatedDay;
+
+// Expose forecast flow so date nav can call it
+window.executeAIStructuredForecastFlow = executeAIStructuredForecastFlow;
+
+// ─────────────────────────────────────────────────────────────
+// Date Navigation — prev/next day in simulator
+// ─────────────────────────────────────────────────────────────
+
+async function navigateSimDay(delta) {
+  const cur = simulatedDate || new Date();
+  const tgt = new Date(cur);
+  tgt.setDate(tgt.getDate() + delta);
+
+  terminalLog(`SIMULATION: Navigating to ${tgt.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}`, 'ok');
+
+  // Check memory for existing prediction
+  const dateStr = tgt.toISOString().split('T')[0];
+  const memories = getMemories('waste');
+  const existing = memories.find(m => m.date === dateStr && m.predicted != null);
+
+  if (existing) {
+    // Reconstruct prediction from memory
+    currentPrediction = {
+      predicted_waste_kg: existing.predicted,
+      waste_risk: existing.risk || 'medium',
+      risk_pct: existing.risk === 'high' ? 75 : existing.risk === 'low' ? 25 : 50,
+      expectedStudents: setupConfig?.avgStudents || 30,
+      main_cause: existing.cause || 'From memory archive',
+      co2_at_risk_kg: (existing.predicted * 3).toFixed(1),
+      date: dateStr
+    };
+    terminalLog(`SIMULATION: Loaded cached prediction for ${dateStr}: ${existing.predicted}kg`, 'ok');
+  } else {
+    // No prediction — run forecast flow
+    terminalLog(`SIMULATION: No prediction for ${dateStr} — running forecast...`, 'warn');
+    try {
+      await executeAIStructuredForecastFlow({ targetDate: tgt });
+    } catch(e) {
+      terminalLog(`SIMULATION: Forecast failed for ${dateStr}: ${e.message}`, 'err');
+      return;
+    }
+  }
+
+  // Close prediction paper if forecast flow opened it
+  toggleWindow('win-prediction-paper');
+
+  // Start simulating the chosen day
+  simulatedDate = tgt;
+  simulatingPredictedDay = true;
+  hasPredictionForToday = true;
+  simulatedDayLabel = tgt.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+
+  // Re-apply risk scaling
+  if (window.students && students.length > 0 && currentPrediction) {
+    const multipliers = { low: 1.0, medium: 1.3, high: 1.6 };
+    const mult = multipliers[currentPrediction.waste_risk] || 1.0;
+    students.forEach(npc => npc.waste_prob = Math.min(0.6, npc.waste_prob * mult));
+  }
+
+  // Reset counters
+  wasteToday = 0;
+  rescuedToday = 0;
+  simWasOpen = null;
+
+  // Ensure sim is unpaused
+  if (window.simPaused) toggleSimPlayPause();
+
+  const simWin = document.getElementById('win-simulation');
+  if (simWin && simWin.classList.contains('hidden')) toggleWindow('win-simulation');
+
+  terminalLog(`SIMULATION: ▶ Now simulating ${simulatedDayLabel}`, 'ok');
+}
+window.navigateSimDay = navigateSimDay;
+
+function jumpToSimDate() {
+  // Create a simple date picker prompt
+  const cur = simulatedDate || new Date();
+  const defaultStr = cur.toISOString().split('T')[0];
+  const pick = prompt('Enter date (YYYY-MM-DD):', defaultStr);
+  if (!pick) return;
+
+  const tgt = new Date(pick + 'T12:00:00');
+  if (isNaN(tgt.getTime())) {
+    terminalLog('SIMULATION: Invalid date entered', 'err');
+    return;
+  }
+
+  // Calculate day difference from current simulated date
+  const curDay = Math.floor((simulatedDate || new Date()).getTime() / 86400000);
+  const tgtDay = Math.floor(tgt.getTime() / 86400000);
+  navigateSimDay(tgtDay - curDay);
+}
+window.jumpToSimDate = jumpToSimDate;
