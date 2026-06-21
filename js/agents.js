@@ -367,10 +367,7 @@ function generateProceduralMap() {
 }
 
 async function generateCafeteriaImage(userPhotoB64) {
-  if(!GEMINI_API_KEY) {
-    terminalLog('GEMINI: No API key — using procedural map fallback', 'warn');
-    return generateProceduralMap();
-  }
+  terminalLog(`GEMINI: Attempting pixel art generation via ${GEMINI_IMG_MODEL}...`, 'run');
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 90000);
