@@ -2,6 +2,7 @@ let students=[], manager=null, animId=null;
 let canvas, ctx;
 window.simPaused = false;
 window.simSpeedMultiplier = 1.0;
+let simWasOpen = null; // tracks open→closed transition for final tracker update
 
 function toggleSimPlayPause() {
   window.simPaused = !window.simPaused;
@@ -136,22 +137,78 @@ function drawZoneOverlays(){
 }
 
 function gameLoop(){
-  if (!window.simPaused) {
-    simTick++;
-    if(manager){manager.update();}
-    for(const npc of students){npc.update();}
+  const isOpen = typeof openOrClosed === 'function' && openOrClosed() === 'OPEN';
+  const hasPrediction = hasPredictionForToday && currentPrediction;
+
+  if (simWasOpen === null) simWasOpen = isOpen;
+  if (simWasOpen === true && !isOpen && hasPrediction) {
+    terminalLog(`SIMULATION: ⏹ Canteen closed — finalizing stats. Waste today: ${wasteToday.toFixed(2)}kg`, 'warn');
+    updateSimWindow();
   }
+  simWasOpen = isOpen;
+
+  if (!window.simPaused && isOpen && hasPrediction) {
+    simTick++;
+    if(manager) manager.update();
+    for(const npc of students) npc.update();
+  }
+
   drawBackground();
   drawZoneOverlays();
-  if(manager){manager.draw(ctx);}
-  for(const npc of students){npc.draw(ctx);}
+
+  if(manager) manager.draw(ctx);
+  for(const npc of students) npc.draw(ctx);
+
   if(ctx){
-    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(10,10,260,36);
-    ctx.fillStyle='#ef4444';ctx.font='bold 13px monospace';
-    ctx.fillText(`🌍 CO₂ Today: ${(wasteToday*CO2_PER_KG).toFixed(2)}kg`,16,24);
+    const hudW = 320, hudX = 10, hudY = 10;
+    let y = hudY + 16;
+
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(hudX, hudY, hudW, 90);
+    ctx.font='bold 11px monospace';
+
+    if (currentPrediction) {
+      ctx.fillStyle='#60a5fa';
+      ctx.fillText(`📊 Expected Waste: ${currentPrediction.predicted_waste_kg}kg`, hudX + 6, y);
+      y += 16;
+      ctx.fillText(`🎯 Expected Students: ${currentPrediction.expectedStudents || setupConfig?.avgStudents || '-'}`, hudX + 6, y);
+      y += 20;
+    }
+
+    ctx.fillStyle='#ef4444'; ctx.font='bold 13px monospace';
+    ctx.fillText(`🌍 CO₂ Today: ${(wasteToday*CO2_PER_KG).toFixed(2)}kg`, hudX + 6, y);
+    y += 16;
     ctx.fillStyle='#10b981';
-    ctx.fillText(`Saved: ${(weekRescued*CO2_PER_KG).toFixed(2)}kg`,16,38);
+    ctx.fillText(`Saved: ${(weekRescued*CO2_PER_KG).toFixed(2)}kg`, hudX + 6, y);
+
+    // Live HUD updates
+    const studentCountEl = document.getElementById('hud-student-count');
+    if (studentCountEl) studentCountEl.textContent = students.length;
+    const riskLed = document.getElementById('hud-risk-led');
+    const riskLabel = document.getElementById('hud-risk-label');
+    if (currentPrediction && riskLed && riskLabel) {
+      const riskColors = { low: '#10b981', medium: '#f59e0b', high: '#ef4444' };
+      const riskLabels = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' };
+      const color = riskColors[currentPrediction.waste_risk] || '#10b981';
+      riskLed.style.backgroundColor = color;
+      riskLed.style.boxShadow = `0 0 8px ${color}`;
+      riskLabel.textContent = riskLabels[currentPrediction.waste_risk] || 'LOW';
+      riskLabel.style.color = color;
+    }
+
+    // Status overlays
+    if (!hasPrediction) {
+      ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(CANVAS_W/2-210, CANVAS_H/2-30, 420, 60);
+      ctx.fillStyle='#f59e0b'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+      ctx.fillText('⏳ Awaiting AI Prediction — Run Agent 2', CANVAS_W/2, CANVAS_H/2);
+      ctx.textAlign='left';
+    } else if (!isOpen) {
+      ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(CANVAS_W/2-160, CANVAS_H/2-20, 320, 40);
+      ctx.fillStyle='#6b7280'; ctx.font='bold 13px monospace'; ctx.textAlign='center';
+      ctx.fillText('🔒 Canteen Closed — Simulation Paused', CANVAS_W/2, CANVAS_H/2);
+      ctx.textAlign='left';
+    }
   }
+
   if(!window.simPaused && simTick%60===0) updateSimWindow();
   animId=requestAnimationFrame(gameLoop);
 }

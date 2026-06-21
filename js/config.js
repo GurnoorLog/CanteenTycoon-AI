@@ -55,7 +55,8 @@ let currentMode = 'cloud';
 let uploadedPhotoB64  = null;
 let generatedMapB64   = null;
 let currentMapConfig  = null;
-let currentPrediction = null;
+let currentPrediction  = null;
+let hasPredictionForToday = false;
 let currentDraft      = null;
 
 let wasteToday    = 0;

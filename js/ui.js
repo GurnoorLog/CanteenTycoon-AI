@@ -160,13 +160,20 @@ function populateRescueWindow(draft) {
 function updateSimWindow() {
   const avgH = students.length ? students.reduce((s,n)=>s+n.hunger,0)/students.length : 0;
   const info = document.querySelector('#win-simulation .os-content .text-right');
-  if(info) info.innerHTML = `
-    <div class="text-xs">STUDENTS: ${students.length}</div>
-    <div class="text-xs">HUNGER: ${Math.round(avgH*100)}%</div>
-    <div class="text-xs">WASTE: ${wasteToday.toFixed(2)}kg</div>
-    <div class="text-xs">RESCUED: ${rescuedToday.toFixed(2)}kg</div>
-    <div class="text-xs">MEALS SAVED: ${mealsSaved}</div>
-    <div class="text-xs">CO₂ OFFSET: ${(weekRescued*CO2_PER_KG).toFixed(2)}kg</div>`;
+  if(info) {
+    let html = `
+      <div class="text-xs">STUDENTS: ${students.length}</div>
+      <div class="text-xs">HUNGER: ${Math.round(avgH*100)}%</div>`;
+    if (currentPrediction) {
+      html += `<div class="text-xs text-blue-400 font-bold">EXPECTED: ${currentPrediction.predicted_waste_kg}kg</div>`;
+    }
+    html += `
+      <div class="text-xs">WASTE: ${wasteToday.toFixed(2)}kg</div>
+      <div class="text-xs">RESCUED: ${rescuedToday.toFixed(2)}kg</div>
+      <div class="text-xs">MEALS SAVED: ${mealsSaved}</div>
+      <div class="text-xs">CO₂ OFFSET: ${(weekRescued*CO2_PER_KG).toFixed(2)}kg</div>`;
+    info.innerHTML = html;
+  }
   updateWidgets();
 }
 

@@ -684,11 +684,17 @@ async function triggerAgent2() {
 
     if(currentPrediction.waste_risk==='high') flashCanvas();
 
+    hasPredictionForToday = true;
+    currentPrediction.expectedStudents = currentPrediction.expectedStudents || setupConfig?.avgStudents || students.length;
+    terminalLog(`SIMULATION: Prediction locked for today — ${currentPrediction.predicted_waste_kg}kg expected`, 'ok');
+
     updateSimWindow();
 
-    if(currentPrediction.waste_risk==='high' && window.students && students.length > 0) {
-      students.forEach(npc => npc.waste_prob = Math.min(0.6, npc.waste_prob * 1.6));
-      terminalLog('AGENT_2: NPC waste probability elevated for high-risk scenario', 'warn');
+    if(window.students && students.length > 0) {
+      const multipliers = { low: 1.0, medium: 1.3, high: 1.6 };
+      const mult = multipliers[currentPrediction.waste_risk] || 1.0;
+      students.forEach(npc => npc.waste_prob = Math.min(0.6, npc.waste_prob * mult));
+      terminalLog(`AGENT_2: NPC waste probability scaled ${mult}x for ${currentPrediction.waste_risk.toUpperCase()} risk scenario`, 'ok');
     }
 
     if(currentPrediction.rescue_needed) {
