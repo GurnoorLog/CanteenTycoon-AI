@@ -397,7 +397,8 @@ async function generateCafeteriaImage(userPhotoB64) {
         }
       };
 
-      const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      const imageUrl = GEMINI_API_KEY ? `${GEMINI_URL}?key=${GEMINI_API_KEY}` : GEMINI_URL;
+      const res = await fetch(imageUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -468,7 +469,8 @@ async function generateWithImagen(userPhotoB64, ctrl) {
     const imgCtrl = ctrl || new AbortController();
     const imgTo = ctrl ? null : setTimeout(() => imgCtrl.abort(), 60000);
 
-    const res = await fetch(`${IMAGEN_URL}?key=${GEMINI_API_KEY}`, {
+    const imagenUrl = GEMINI_API_KEY ? `${IMAGEN_URL}?key=${GEMINI_API_KEY}` : IMAGEN_URL;
+    const res = await fetch(imagenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
