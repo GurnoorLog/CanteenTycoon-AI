@@ -1822,9 +1822,6 @@
             // generateCafeteriaImage always returns a valid image (procedural fallback on any error)
             mapGeneratedB64 = await generateCafeteriaImage(uploadedPhotoB64);
 
-            // Ensure minimum display time so user sees the pixel-art step
-            await new Promise(r => setTimeout(r, 800));
-
             updateLoadingBar(80, 'AI analyzing layout zones...', 0.6);
 
             currentMapConfig = await runAgent1(mapGeneratedB64);
