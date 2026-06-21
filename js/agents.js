@@ -293,39 +293,63 @@ async function callChatAI(system, history) {
   throw new Error('Could not reach any AI model. Check server API key configuration.');
 }
 
+// ── Seeded random (for varied procedural maps) ──────────────────────────────
+function mulberry32(a) { return function() { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; } }
+
 // ── Procedural pixel-art cafeteria map (fallback when Gemini fails) ──────────
 function generateProceduralMap() {
   const SIZE = 512;
   const canvas = document.createElement('canvas');
   canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
+  const rng = mulberry32(Date.now() + Math.floor(Math.random()*99999));
 
-  // Floor — warm checkerboard
+  // Floor — random checkerboard tones
+  const floorA = ['#f5deb3','#e8c99a','#f0d9a0','#e0c890','#f2e0b0'][Math.floor(rng()*5)];
+  const floorB = ['#e8c99a','#d4b87a','#dcca90','#c8a870','#ddc090'][Math.floor(rng()*5)];
   for(let y=0;y<SIZE;y+=16) for(let x=0;x<SIZE;x+=16) {
-    ctx.fillStyle = ((x+y)/16)%2===0 ? '#f5deb3' : '#e8c99a';
+    ctx.fillStyle = ((x+y)/16)%2===0 ? floorA : floorB;
     ctx.fillRect(x,y,16,16);
   }
-  // Wall border
-  ctx.fillStyle='#8B6914'; ctx.fillRect(0,0,SIZE,16); ctx.fillRect(0,SIZE-16,SIZE,16);
+
+  // Wall border — random brown
+  const wallColors = ['#8B6914','#7a5e10','#9c7820','#6b5010','#8a7018'];
+  const wallCol = wallColors[Math.floor(rng()*5)];
+  ctx.fillStyle=wallCol; ctx.fillRect(0,0,SIZE,16); ctx.fillRect(0,SIZE-16,SIZE,16);
   ctx.fillRect(0,0,16,SIZE); ctx.fillRect(SIZE-16,0,16,SIZE);
 
-  // Serving counter (north)
-  ctx.fillStyle='#5c8a5c'; ctx.fillRect(24,20,SIZE-48,44);
-  ctx.fillStyle='#4a7a4a'; ctx.fillRect(24,52,SIZE-48,8);
-  // Food trays on counter
-  const trayColors=['#e74c3c','#f39c12','#27ae60','#3498db','#9b59b6'];
-  for(let i=0;i<5;i++){ctx.fillStyle=trayColors[i];ctx.fillRect(50+i*80,28,60,16);
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fillRect(56+i*80,32,20,8);}
+  // Random counter colors
+  const counterCols = ['#5c8a5c','#4a7a6a','#6a8a4c','#5a7a6c','#4c8a5a'];
+  const counterMain = counterCols[Math.floor(rng()*5)];
+  const counterDark = ['#4a7a4a','#3a6a5a','#5a7a3c','#4a6a5c','#3c7a4a'][Math.floor(rng()*5)];
+  ctx.fillStyle=counterMain; ctx.fillRect(24,20,SIZE-48,44);
+  ctx.fillStyle=counterDark; ctx.fillRect(24,52,SIZE-48,8);
+  // Food trays
+  const trayColors=['#e74c3c','#f39c12','#27ae60','#3498db','#9b59b6','#e67e22','#1abc9c'];
+  const numTrays = 3 + Math.floor(rng()*4);
+  const trayOffset = (SIZE-48 - numTrays*80)/2 + 24;
+  for(let i=0;i<numTrays;i++) {
+    ctx.fillStyle=trayColors[Math.floor(rng()*trayColors.length)];
+    ctx.fillRect(trayOffset+i*80,28,60,16);
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.fillRect(trayOffset+6+i*80,32,20,8);
+  }
 
-  // Dining tables (4 rows x 3 cols)
+  // Random number of tables (2-5 rows x 2-4 cols)
+  const tableRows = 2 + Math.floor(rng()*4);
+  const tableCols = 2 + Math.floor(rng()*3);
   const tableW=60,tableH=32,chairSize=10;
-  for(let row=0;row<4;row++) for(let col=0;col<3;col++) {
-    const tx=50+col*148, ty=100+row*98;
+  const tableWarmth = ['#c8a96e','#d4b06a','#c0a060','#d0a870','#c89860'];
+  const tableCol = tableWarmth[Math.floor(rng()*5)];
+  const chairCols = ['#e8b86d','#d4a060','#e0b060','#d8a868'];
+  for(let row=0;row<tableRows;row++) for(let col=0;col<tableCols;col++) {
+    const tx=40+col*(140+Math.floor(rng()*20)), ty=90+row*(90+Math.floor(rng()*16));
     // Table
-    ctx.fillStyle='#c8a96e'; ctx.fillRect(tx,ty,tableW,tableH);
-    ctx.strokeStyle='#8B6914'; ctx.lineWidth=2; ctx.strokeRect(tx,ty,tableW,tableH);
-    // Chairs (top, bottom, left, right)
-    ctx.fillStyle='#e8b86d';
+    ctx.fillStyle=tableCol; ctx.fillRect(tx,ty,tableW,tableH);
+    ctx.strokeStyle=wallCol; ctx.lineWidth=2; ctx.strokeRect(tx,ty,tableW,tableH);
+    // Chairs
+    const chairC = chairCols[Math.floor(rng()*chairCols.length)];
+    ctx.fillStyle=chairC;
     ctx.fillRect(tx+10,ty-chairSize-2,chairSize,chairSize);
     ctx.fillRect(tx+40,ty-chairSize-2,chairSize,chairSize);
     ctx.fillRect(tx+10,ty+tableH+2,chairSize,chairSize);
@@ -334,28 +358,36 @@ function generateProceduralMap() {
     ctx.fillRect(tx+tableW+2,ty+8,chairSize,chairSize);
   }
 
-  // Kitchen area (north-west)
-  ctx.fillStyle='#7f8c8d'; ctx.fillRect(20,20,80,44);
-  ctx.fillStyle='#95a5a6'; ctx.fillRect(24,24,72,36);
-  ctx.fillStyle='#e74c3c'; ctx.fillRect(32,30,16,16); // stove
-  ctx.fillStyle='#e67e22'; ctx.fillRect(56,30,16,16);
+  // Kitchen area (north-west) with random appliances
+  const kitchenColors = ['#7f8c8d','#6a7a7a','#8a9a9a','#7a8a8a'];
+  ctx.fillStyle=kitchenColors[Math.floor(rng()*4)]; ctx.fillRect(20,20,80,44);
+  ctx.fillStyle=kitchenColors[(Math.floor(rng()*3)+1)%4]; ctx.fillRect(24,24,72,36);
+  const stoveColors = ['#e74c3c','#c0392b','#e67e22','#d35400'];
+  ctx.fillStyle=stoveColors[Math.floor(rng()*4)]; ctx.fillRect(32,30,16,16);
+  ctx.fillStyle=stoveColors[Math.floor(rng()*4)]; ctx.fillRect(56,30,16,16);
   ctx.fillStyle='#2c3e50'; ctx.fillRect(76,26,12,32);
 
-  // Waste bins (south-east)
-  [[420,460],[454,460]].forEach(([bx,by])=>{
-    ctx.fillStyle='#2ecc71'; ctx.fillRect(bx,by,22,28);
-    ctx.fillStyle='#27ae60'; ctx.fillRect(bx,by,22,6);
+  // Waste bins (south-east) — random positions
+  const bx1 = 400+Math.floor(rng()*40), by1 = 440+Math.floor(rng()*30);
+  const bx2 = bx1+28+Math.floor(rng()*10), by2 = by1-5+Math.floor(rng()*10);
+  const binColors = ['#2ecc71','#27ae60','#1abc9c','#16a085'];
+  [[bx1,by1],[bx2,by2]].forEach(([bx,by])=>{
+    ctx.fillStyle=binColors[Math.floor(rng()*binColors.length)]; ctx.fillRect(bx,by,22,28);
+    ctx.fillStyle=binColors[Math.floor(rng()*binColors.length)]; ctx.fillRect(bx,by,22,6);
     ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(bx+4,by+8,14,16);
   });
 
-  // Entrance door (south)
-  ctx.fillStyle='#3498db'; ctx.fillRect(210,496,90,12);
-  ctx.fillStyle='#2980b9'; ctx.fillRect(240,490,30,16);
+  // Entrance door (south) — random position
+  const doorX = 180+Math.floor(rng()*80);
+  ctx.fillStyle=['#3498db','#2980b9','#2e86c1','#1f6f9f'][Math.floor(rng()*4)];
+  ctx.fillRect(doorX,496,90,12);
+  ctx.fillStyle=['#2980b9','#1f6f9f','#2e86c1','#18507a'][Math.floor(rng()*4)];
+  ctx.fillRect(doorX+30,490,30,16);
 
-  // Labels (tiny)
+  // Labels
   ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.font='9px monospace';
   ctx.fillText('SERVING',180,48); ctx.fillText('KITCHEN',22,76);
-  ctx.fillText('WASTE',412,492); ctx.fillText('ENTRANCE',212,510);
+  ctx.fillText('WASTE',bx1,by1+36); ctx.fillText('ENTRANCE',doorX+10,512);
 
   terminalLog('AGENT_1: Procedural pixel-art map generated (Gemini fallback)', 'warn');
   return canvas.toDataURL('image/png');
