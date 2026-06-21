@@ -362,56 +362,84 @@ function generateProceduralMap() {
 }
 
 async function generateCafeteriaImage(userPhotoB64) {
-  if (!userPhotoB64) {
-    terminalLog('MAP: No photo uploaded — using procedural pixel-art map', 'warn');
+  if(!GEMINI_API_KEY) {
+    terminalLog('GEMINI: No API key — using procedural map fallback', 'warn');
     return generateProceduralMap();
   }
-  terminalLog('MAP: Converting photo to pixel art (client-side)...', 'run');
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error('Image load failed'));
-      i.src = userPhotoB64;
-    });
-    const SIZE = 512;
-    const BLOCK = 8;
-    const canvas = document.createElement('canvas');
-    canvas.width = SIZE; canvas.height = SIZE;
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    // Step 1: draw photo at tiny resolution for pixel block effect
-    const thumbSize = SIZE / BLOCK;
-    ctx.drawImage(img, 0, 0, thumbSize, thumbSize);
-    // Step 2: scale back up with nearest-neighbor for hard pixel edges
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(canvas, 0, 0, thumbSize, thumbSize, 0, 0, SIZE, SIZE);
-    // Step 3: quantize colors to retro 16-color palette
-    const palette = [
-      [0,0,0],[255,255,255],[136,0,0],[170,255,238],
-      [204,68,204],[0,204,85],[0,0,170],[238,238,119],
-      [221,136,85],[102,68,0],[255,204,170],[15,23,42],
-      [16,185,129],[100,116,139],[241,245,249],[203,213,225]
-    ];
-    const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
-    const d = imageData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      let best = 0, bestDist = Infinity;
-      for (let p = 0; p < palette.length; p++) {
-        const dr = d[i] - palette[p][0];
-        const dg = d[i+1] - palette[p][1];
-        const db = d[i+2] - palette[p][2];
-        const dist = dr*dr + dg*dg + db*db;
-        if (dist < bestDist) { bestDist = dist; best = p; }
+  terminalLog(`GEMINI: Generating pixel art map using ${GEMINI_IMG_MODEL}...`, 'run');
+
+  const style = `Modern pixel art, strict orthographic top-down bird's-eye view (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit palette, bright warm colors, game-ready like Stardew Valley top-down view.`;
+  const layout = userPhotoB64
+    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo.`
+    : `School cafeteria: wall borders, serving counter along north wall with food trays, 4 rows of dining tables with chairs, 2 trash bins near south-east, small kitchen area north-west, entrance door south, checkered floor.`;
+  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only.`;
+
+  const parts = [];
+  if(userPhotoB64) {
+    parts.push({
+      inline_data:{
+        mime_type: userPhotoB64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        data: userPhotoB64.replace(/^data:image\/\w+;base64,/,'')
       }
-      d[i] = palette[best][0]; d[i+1] = palette[best][1];
-      d[i+2] = palette[best][2];
+    });
+  }
+  parts.push({text: `${style} ${layout} ${quality}`});
+
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 90000);
+
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{parts}],
+        generationConfig:{responseModalities:['IMAGE','TEXT']}
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+
+    if(!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try { const e=await res.json(); errMsg = e.error?.message || e.error?.code || JSON.stringify(e).substring(0,200); } catch(_){}
+      terminalLog(`GEMINI: API error — ${errMsg}. Using procedural fallback.`, 'warn');
+      return generateProceduralMap();
     }
-    ctx.putImageData(imageData, 0, 0);
-    terminalLog('MAP: Pixel art created from your photo ✓', 'ok');
-    return canvas.toDataURL('image/png');
+
+    const d = await res.json();
+
+    // Log what we got for debugging
+    const candidate = d.candidates?.[0];
+    if(!candidate) {
+      const reason = d.promptFeedback?.blockReason || 'unknown';
+      terminalLog(`GEMINI: Blocked (${reason}) — using procedural fallback`, 'warn');
+      return generateProceduralMap();
+    }
+    if(candidate.finishReason && candidate.finishReason !== 'STOP') {
+      terminalLog(`GEMINI: Finish reason ${candidate.finishReason} — using procedural fallback`, 'warn');
+      return generateProceduralMap();
+    }
+
+    for(const part of candidate.content.parts) {
+      const inlineData = part.inlineData || part.inline_data;
+      if(inlineData) {
+        const mimeType = inlineData.mimeType || inlineData.mime_type;
+        const data = inlineData.data;
+        terminalLog('GEMINI: Image received successfully ✓', 'ok');
+        return `data:${mimeType};base64,${data}`;
+      }
+    }
+
+    // Model returned text only — log it and fall back
+    const textPart = candidate.content.parts.find(p=>p.text)?.text || '';
+    terminalLog(`GEMINI: Text-only response ("${textPart.substring(0,60)}...") — using procedural fallback`, 'warn');
+    return generateProceduralMap();
+
   } catch(e) {
-    terminalLog(`MAP: Pixel conversion failed (${e.message}) — using procedural fallback`, 'warn');
+    clearTimeout(to);
+    if(e.name === 'AbortError') terminalLog('GEMINI: Timed out — using procedural fallback', 'warn');
+    else terminalLog(`GEMINI: ${e.message} — using procedural fallback`, 'warn');
     return generateProceduralMap();
   }
 }
