@@ -985,6 +985,12 @@
                 <input class="w-full pixel-border p-sm font-body-md text-xs" type="file" accept="image/*" id="settings-photo"/>
                 <span id="settings-photo-name" class="text-[10px] text-slate-400 mt-1 block"></span>
             </div>
+            <div class="mt-2">
+                <button class="w-full bg-indigo-500 text-white pixel-border py-sm px-4 font-label-lg uppercase text-xs hover:bg-indigo-600 transition-colors flex items-center justify-center gap-2" onclick="closeCanteenSettings();setTimeout(generateMapAgain,300)">
+                    <span>🔄</span> Regenerate Map from Photo
+                </button>
+                <p class="text-[9px] text-slate-400 mt-1">Re-analyzes the uploaded photo and generates a new pixel-art map.</p>
+            </div>
         </div>
         <div class="mt-lg flex gap-2">
             <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase" onclick="saveCanteenSettings()">Save Changes</button>
@@ -2180,6 +2186,14 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     function applyGoogleUserToUI(payload) {
         setupConfig.googleUser = payload;
         localStorage.setItem('ct_google_user', JSON.stringify(payload));
+        // Save to known accounts list
+        try {
+            const accounts = JSON.parse(localStorage.getItem('ct_google_accounts') || '[]');
+            const idx = accounts.findIndex(a => a.email === payload.email);
+            const entry = { email: payload.email, name: payload.name || payload.email.split('@')[0], picture: payload.picture || '' };
+            if (idx >= 0) { accounts[idx] = entry; } else { accounts.push(entry); }
+            localStorage.setItem('ct_google_accounts', JSON.stringify(accounts));
+        } catch(e) {}
         document.getElementById('gsi-status')?.classList.remove('hidden');
         const emailEl = document.getElementById('gsi-email');
         if (emailEl) emailEl.textContent = payload.email;
@@ -2634,10 +2648,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         { id:'win-menu-editor',label:'Menu Editor',      icon:'📋', color:'#8b5cf6' },
         { id:'win-weather',    label:'Weather',           icon:'☁️', color:'#3b82f6' },
         { id:'win-ai-logs',    label:'AI Decision Logs', icon:'🤖', color:'#ec4899' },
-        { id:'win-agents',     label:'Agent Control',    icon:'🎮', color:'#14b8a6' },
         { id:'win-prediction-paper', label:'Forecast Report', icon:'📄', color:'#f97316' },
         { id:'settings',       label:'Settings',          icon:'⚙️', color:'#64748b' },
-        { id:'api',            label:'API Configuration', icon:'🔑', color:'#0f172a' },
     ];
 
     function buildStartApps(filter) {
@@ -2656,7 +2668,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     function launchStartApp(id) {
         closeStartMenu();
         if (id === 'settings') { openCanteenSettings(); return; }
-        if (id === 'api') { openApiSettings(); return; }
         toggleWindow(id);
     }
 
@@ -2726,18 +2737,31 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         const dropdown = document.getElementById('start-user-dropdown');
         if (!dropdown) return;
         if (dropdown.classList.contains('hidden')) {
-            // Build account list
+            const accounts = JSON.parse(localStorage.getItem('ct_google_accounts') || '[]');
+            const currentEmail = setupConfig?.googleUser?.email || '';
             let html = '';
-            if (setupConfig?.googleUser?.email) {
+            // Current user (always first)
+            if (currentEmail) {
                 const u = setupConfig.googleUser;
                 const initial = (u.name || u.email)[0].toUpperCase();
-                html += `<div class="dropdown-item" onclick="event.stopPropagation();closeStartMenu();">`;
+                html += `<div class="dropdown-item" style="background:#eef2ff" onclick="event.stopPropagation();closeStartMenu();closeUserMenu();">`;
                 html += `<div class="mini-avatar" style="background:${u.picture?'transparent':'#10b981'}">`;
                 if (u.picture) html += `<img src="${u.picture}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">`;
                 else html += initial;
-                html += `</div><div><div style="font-size:11px">${u.name || u.email.split('@')[0]}</div><div style="font-size:9px;opacity:0.6">${u.email}</div></div>`;
+                html += `</div><div><div style="font-size:11px">${u.name || u.email.split('@')[0]}</div><div style="font-size:9px;opacity:0.6">${u.email} ✓</div></div>`;
                 html += `</div>`;
             }
+            // Other known accounts
+            accounts.forEach(a => {
+                if (a.email === currentEmail) return;
+                const initial = (a.name || a.email)[0].toUpperCase();
+                html += `<div class="dropdown-item" onclick="event.stopPropagation();closeUserMenu();closeStartMenu();switchToAccount('${a.email}')">`;
+                html += `<div class="mini-avatar" style="background:${a.picture?'transparent':'#64748b'}">`;
+                if (a.picture) html += `<img src="${a.picture}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">`;
+                else html += initial;
+                html += `</div><div><div style="font-size:11px">${a.name || a.email.split('@')[0]}</div><div style="font-size:9px;opacity:0.6">${a.email}</div></div>`;
+                html += `</div>`;
+            });
             html += `<div class="dropdown-item add-account" onclick="event.stopPropagation();addGoogleAccount()">`;
             html += `<span>➕</span> Add another account`;
             html += `</div>`;
@@ -2746,13 +2770,27 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
             html += `</div>`;
             dropdown.innerHTML = html;
             dropdown.classList.remove('hidden');
-            // Close on outside click
             setTimeout(() => {
                 document.addEventListener('click', closeUserMenu, { once: true });
             }, 10);
         } else {
             dropdown.classList.add('hidden');
         }
+    }
+
+    function switchToAccount(email) {
+        const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+        if (!cid || typeof google === 'undefined' || !google.accounts?.oauth2) {
+            if (typeof terminalLog === 'function') terminalLog('GOOGLE: Configure Google Client ID in API settings first', 'err');
+            return;
+        }
+        google.accounts.oauth2.initTokenClient({
+            client_id: cid,
+            scope: GOOGLE_SCOPES,
+            prompt: 'select_account',
+            login_hint: email,
+            callback: onGoogleTokenResponse
+        }).requestAccessToken();
     }
 
     function closeUserMenu() {
