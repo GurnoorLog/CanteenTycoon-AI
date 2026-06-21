@@ -1731,6 +1731,20 @@ Awaiting manager approval to dispatch logistics.`);
   const approveBtn = document.getElementById('pred-paper-approve-btn');
   if (approveBtn) { approveBtn.disabled = true; approveBtn.style.opacity = '0.4'; approveBtn.style.cursor = 'not-allowed'; }
 
+  // Show simulate button only if target date is NOT today
+  const simBtn = document.getElementById('pred-paper-simulate-btn');
+  if (simBtn) {
+    const todayStr = new Date().toDateString();
+    const targetStr = tgt instanceof Date ? tgt.toDateString() : todayStr;
+    if (targetStr !== todayStr) {
+      const dayDisplay = tgt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      simBtn.textContent = `▶ Simulate ${dayDisplay}`;
+      simBtn.style.display = 'block';
+    } else {
+      simBtn.style.display = 'none';
+    }
+  }
+
   // Show window
   win.classList.remove('hidden');
   win.style.zIndex = '80';
@@ -1891,3 +1905,61 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 });
+
+// ─────────────────────────────────────────────────────────────
+// Simulated Day — "skip to predicted day"
+// ─────────────────────────────────────────────────────────────
+
+function startSimulatedDay() {
+  const pred = currentPrediction;
+  if (!pred) return;
+
+  const dayName = document.getElementById('pred-paper-simulate-btn')?.textContent?.replace('▶ Simulate ', '') || 'today';
+  simulatingPredictedDay = true;
+  simulatedDayLabel = dayName;
+
+  // Apply NPC risk scaling from this prediction
+  if (window.students && students.length > 0) {
+    const multipliers = { low: 1.0, medium: 1.3, high: 1.6 };
+    const mult = multipliers[pred.waste_risk] || 1.0;
+    students.forEach(npc => npc.waste_prob = Math.min(0.6, npc.waste_prob * mult));
+    terminalLog(`SIMULATION: NPC waste probability scaled ${mult}x for ${pred.waste_risk.toUpperCase()} risk (simulated day)`, 'ok');
+  }
+
+  // Reset waste counters for fresh simulated day
+  wasteToday = 0;
+  rescuedToday = 0;
+  simWasOpen = null;
+
+  // If sim is paused, unpause it
+  if (window.simPaused) toggleSimPlayPause();
+
+  // Close the prediction paper
+  toggleWindow('win-prediction-paper');
+
+  // Open/focus the simulation window
+  const simWin = document.getElementById('win-simulation');
+  if (simWin && simWin.classList.contains('hidden')) toggleWindow('win-simulation');
+
+  terminalLog(`SIMULATION: ▶ Simulating ${simulatedDayLabel} — prediction: ${pred.predicted_waste_kg}kg expected`, 'ok');
+}
+window.startSimulatedDay = startSimulatedDay;
+
+function stopSimulatedDay() {
+  simulatingPredictedDay = false;
+  simulatedDayLabel = '';
+
+  // Reset NPC waste probabilities back to defaults
+  if (window.students && students.length > 0) {
+    const defs = NPC_TYPES;
+    students.forEach((npc, i) => {
+      const def = defs[i % defs.length];
+      npc.waste_prob = def.wasteProb;
+    });
+  }
+
+  terminalLog('SIMULATION: ⏹ Stopped simulated day — returning to real-time canteen hours', 'ok');
+
+  // If canteen is now closed, the gameLoop will show the closed overlay automatically
+}
+window.stopSimulatedDay = stopSimulatedDay;

@@ -87,6 +87,13 @@ function initCanvas(){
         <span id="hud-risk-label" class="font-bold text-emerald-400 uppercase">LOW</span>
       </div>
     </div>
+
+    <!-- Simulated Day Indicator (hidden by default) -->
+    <div id="sim-mode-indicator" class="flex items-center gap-1.5 ml-3 hidden">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]"></span>
+      <span id="sim-mode-label" class="font-bold text-emerald-300 text-[9px] uppercase">SIMULATING: --</span>
+      <button onclick="stopSimulatedDay()" class="ml-1 px-1.5 py-0.5 bg-amber-700 hover:bg-amber-600 border border-amber-500 text-white font-bold uppercase rounded active:scale-95 transition-all cursor-pointer text-[8px] tracking-wider">STOP</button>
+    </div>
   `;
   simContent.appendChild(hud);
   
@@ -195,8 +202,25 @@ function gameLoop(){
       riskLabel.style.color = color;
     }
 
+    // Update simulated day indicator in HUD toolbar
+    const simIndicator = document.getElementById('sim-mode-indicator');
+    const simLabel = document.getElementById('sim-mode-label');
+    if (simIndicator && simLabel) {
+      if (simulatingPredictedDay) {
+        simIndicator.classList.remove('hidden');
+        simLabel.textContent = `SIMULATING: ${simulatedDayLabel.toUpperCase()}`;
+      } else {
+        simIndicator.classList.add('hidden');
+      }
+    }
+
     // Status overlays
-    if (!hasPrediction) {
+    if (simulatingPredictedDay) {
+      ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(CANVAS_W/2-210, CANVAS_H/2-30, 420, 60);
+      ctx.fillStyle='#34d399'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+      ctx.fillText(`▶ SIMULATING: ${simulatedDayLabel.toUpperCase()}`, CANVAS_W/2, CANVAS_H/2);
+      ctx.textAlign='left';
+    } else if (!hasPrediction) {
       ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(CANVAS_W/2-210, CANVAS_H/2-30, 420, 60);
       ctx.fillStyle='#f59e0b'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
       ctx.fillText('⏳ Awaiting AI Prediction — Run Agent 2', CANVAS_W/2, CANVAS_H/2);

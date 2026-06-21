@@ -845,6 +845,7 @@ function recordObservation(type, data) {
 }
 
 function openOrClosed() {
+  if (simulatingPredictedDay) return 'OPEN';
   const now = new Date();
   const h = now.getHours(), m = now.getMinutes();
   const open = (setupConfig?.openTime || '07:00').split(':').map(Number);
