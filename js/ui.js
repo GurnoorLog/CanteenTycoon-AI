@@ -733,7 +733,7 @@ function approvePredictionPaper() {
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-  const subject = `🍽️ Surplus Food Dispatch — ${canteenName} — ${dateStr}`;
+  const subject = `Food Surplus Dispatch - ${canteenName} - ${dateStr}`;
   const body = `Dear ${shelterName} Team,
 
 Greetings from ${canteenName}!
@@ -804,7 +804,7 @@ async function confirmSendEmail() {
       const raw = [
         'Content-Type: text/plain; charset="UTF-8"',
         'MIME-Version: 1.0',
-        'Content-Transfer-Encoding: 7bit',
+        'Content-Transfer-Encoding: 8bit',
         'To: ' + to,
         'Subject: ' + subject,
         'From: ' + fromEmail,
