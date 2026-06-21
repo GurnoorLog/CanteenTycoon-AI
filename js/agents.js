@@ -207,7 +207,12 @@ async function callGeminiVision(system, user, imageB64=null) {
   if(imageB64) {
     const data = imageB64.replace(/^data:image\/\w+;base64,/,'');
     const mt = imageB64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-    parts.push({inline_data:{mime_type:mt, data}});
+    parts.push({
+      inlineData: {
+        mimeType: mt,
+        data: data
+      }
+    });
   }
   parts.push({text: `${system}\n\n${user}`});
   const model = (typeof GEMINI_VIS_MODEL !== 'undefined' ? GEMINI_VIS_MODEL : 'gemini-1.5-flash');
@@ -366,81 +371,137 @@ async function generateCafeteriaImage(userPhotoB64) {
     terminalLog('GEMINI: No API key — using procedural map fallback', 'warn');
     return generateProceduralMap();
   }
-  terminalLog(`GEMINI: Generating pixel art map using ${GEMINI_IMG_MODEL}...`, 'run');
-
-  const style = `Modern pixel art, strict orthographic top-down bird's-eye view (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit palette, bright warm colors, game-ready like Stardew Valley top-down view.`;
-  const layout = userPhotoB64
-    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo.`
-    : `School cafeteria: wall borders, serving counter along north wall with food trays, 4 rows of dining tables with chairs, 2 trash bins near south-east, small kitchen area north-west, entrance door south, checkered floor.`;
-  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only.`;
-
-  const parts = [];
-  if(userPhotoB64) {
-    parts.push({
-      inline_data:{
-        mime_type: userPhotoB64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-        data: userPhotoB64.replace(/^data:image\/\w+;base64,/,'')
-      }
-    });
-  }
-  parts.push({text: `${style} ${layout} ${quality}`});
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 90000);
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents:[{parts}],
-        generationConfig:{responseModalities:['IMAGE','TEXT']}
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(to);
+    let result;
 
-    if(!res.ok) {
-      let errMsg = `HTTP ${res.status}`;
-      try { const e=await res.json(); errMsg = e.error?.message || e.error?.code || JSON.stringify(e).substring(0,200); } catch(_){}
-      terminalLog(`GEMINI: API error — ${errMsg}. Using procedural fallback.`, 'warn');
-      return generateProceduralMap();
-    }
+    if (userPhotoB64) {
+      // ── PATH A: Transform uploaded photo → pixel art via Gemini 2.0 Flash Image Gen ──
+      terminalLog(`GEMINI: Transforming uploaded photo to pixel art using ${GEMINI_IMG_MODEL}...`, 'run');
 
-    const d = await res.json();
+      const prompt = `Transform this school cafeteria photo into modern pixel art. Render it as a strict orthographic top-down bird's-eye view (looking directly straight down, zero perspective, zero isometric angle), 512×512 pixels, clean 16-bit palette with warm bright colors, game-ready style like Stardew Valley top-down view. Show serving counter along the north wall, rows of dining tables with chairs, kitchen area, waste bins, entrance door. No labels, no UI elements, no text overlays. High quality pixel art only.`;
 
-    // Log what we got for debugging
-    const candidate = d.candidates?.[0];
-    if(!candidate) {
-      const reason = d.promptFeedback?.blockReason || 'unknown';
-      terminalLog(`GEMINI: Blocked (${reason}) — using procedural fallback`, 'warn');
-      return generateProceduralMap();
-    }
-    if(candidate.finishReason && candidate.finishReason !== 'STOP') {
-      terminalLog(`GEMINI: Finish reason ${candidate.finishReason} — using procedural fallback`, 'warn');
-      return generateProceduralMap();
-    }
+      const mimeType = userPhotoB64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const imageData = userPhotoB64.replace(/^data:image\/\w+;base64,/, '');
 
-    for(const part of candidate.content.parts) {
-      const inlineData = part.inlineData || part.inline_data;
-      if(inlineData) {
-        const mimeType = inlineData.mimeType || inlineData.mime_type;
-        const data = inlineData.data;
-        terminalLog('GEMINI: Image received successfully ✓', 'ok');
-        return `data:${mimeType};base64,${data}`;
+      const body = {
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mimeType, data: imageData } },
+            { text: prompt }
+          ]
+        }],
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          temperature: 1.0
+        }
+      };
+
+      const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const e = await res.json(); errMsg = e.error?.message || JSON.stringify(e).substring(0, 200); } catch(_) {}
+        terminalLog(`GEMINI: Photo-edit error — ${errMsg}. Trying Imagen fallback...`, 'warn');
+        result = await generateWithImagen(null, ctrl);
+      } else {
+        const d = await res.json();
+        result = extractGeminiImage(d);
+        if (!result) {
+          terminalLog('GEMINI: No image in photo-edit response — trying Imagen fallback...', 'warn');
+          result = await generateWithImagen(null, ctrl);
+        }
       }
+
+    } else {
+      // ── PATH B: Pure generation via Imagen 3 (no reference photo) ──
+      clearTimeout(to);
+      result = await generateWithImagen(null, null);
     }
 
-    // Model returned text only — log it and fall back
-    const textPart = candidate.content.parts.find(p=>p.text)?.text || '';
-    terminalLog(`GEMINI: Text-only response ("${textPart.substring(0,60)}...") — using procedural fallback`, 'warn');
-    return generateProceduralMap();
+    return result || generateProceduralMap();
 
   } catch(e) {
     clearTimeout(to);
-    if(e.name === 'AbortError') terminalLog('GEMINI: Timed out — using procedural fallback', 'warn');
+    if (e.name === 'AbortError') terminalLog('GEMINI: Timed out — using procedural fallback', 'warn');
     else terminalLog(`GEMINI: ${e.message} — using procedural fallback`, 'warn');
     return generateProceduralMap();
+  }
+}
+
+/** Extract the first inline image from a Gemini generateContent response */
+function extractGeminiImage(d) {
+  const candidate = d.candidates?.[0];
+  if (!candidate) {
+    const reason = d.promptFeedback?.blockReason || 'unknown';
+    terminalLog(`GEMINI: Blocked (${reason})`, 'warn');
+    return null;
+  }
+  if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+    terminalLog(`GEMINI: Finish reason ${candidate.finishReason}`, 'warn');
+    return null;
+  }
+  for (const part of (candidate.content?.parts || [])) {
+    const inlineData = part.inlineData || part.inline_data;
+    if (inlineData) {
+      terminalLog('GEMINI: Image received successfully ✓', 'ok');
+      return `data:${inlineData.mimeType || inlineData.mime_type};base64,${inlineData.data}`;
+    }
+  }
+  const textPart = candidate.content?.parts?.find(p => p.text)?.text || '';
+  terminalLog(`GEMINI: Text-only response ("${textPart.substring(0, 60)}...")`, 'warn');
+  return null;
+}
+
+/** Generate cafeteria pixel-art via Imagen 3 */
+async function generateWithImagen(userPhotoB64, ctrl) {
+  terminalLog(`GEMINI: Generating pixel art with Imagen 3...`, 'run');
+  const prompt = `Modern pixel art school cafeteria, strict orthographic top-down bird's-eye view looking directly straight down with zero perspective, 512×512 pixels, clean 16-bit palette, warm bright colors, game-ready Stardew Valley style. Serving counter along north wall with food trays, 4 rows of long dining tables with chairs, small kitchen area in north-west corner, 2 waste bins near south-east, entrance door on south wall, checkered tile floor. No text, no labels, no UI elements.`;
+
+  try {
+    const imgCtrl = ctrl || new AbortController();
+    const imgTo = ctrl ? null : setTimeout(() => imgCtrl.abort(), 60000);
+
+    const res = await fetch(`${IMAGEN_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: { sampleCount: 1, aspectRatio: '1:1' }
+      }),
+      signal: imgCtrl.signal
+    });
+    if (imgTo) clearTimeout(imgTo);
+
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try { const e = await res.json(); errMsg = e.error?.message || JSON.stringify(e).substring(0, 200); } catch(_) {}
+      terminalLog(`IMAGEN: Error -- ${errMsg}. Using procedural fallback.`, 'warn');
+      return null;
+    }
+
+    const d = await res.json();
+    const pred = d.predictions?.[0];
+    if (pred?.bytesBase64Encoded) {
+      terminalLog('IMAGEN: Pixel art generated successfully v', 'ok');
+      return `data:image/png;base64,${pred.bytesBase64Encoded}`;
+    }
+    terminalLog('IMAGEN: No image bytes in response. Using procedural fallback.', 'warn');
+    return null;
+
+  } catch(e) {
+    if (e.name === 'AbortError') terminalLog('IMAGEN: Timed out -- using procedural fallback', 'warn');
+    else terminalLog(`IMAGEN: ${e.message} -- using procedural fallback`, 'warn');
+    return null;
   }
 }
 

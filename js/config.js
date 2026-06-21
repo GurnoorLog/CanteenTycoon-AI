@@ -28,11 +28,13 @@ let GOOGLE_CLIENT_ID = localStorage.getItem('ct_google_client_id') || '';
 })();
 
 const CLAUDE_MODEL     = 'claude-sonnet-4-5';
-const GEMINI_IMG_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_IMG_MODEL = 'gemini-2.0-flash-preview-image-generation';
 const GEMINI_VIS_MODEL = 'gemini-1.5-flash';
+const IMAGEN_MODEL     = 'imagen-3.0-generate-002';
 
-const CLAUDE_URL  = '/proxy/claude';
-const GEMINI_URL  = `/proxy/gemini/v1beta/models/${GEMINI_IMG_MODEL}:generateContent`;
+const CLAUDE_URL    = '/proxy/claude';
+const GEMINI_URL    = `/proxy/gemini/v1beta/models/${GEMINI_IMG_MODEL}:generateContent`;
+const IMAGEN_URL    = `/proxy/gemini/v1beta/models/${IMAGEN_MODEL}:predict`;
 const GEMINI_VIS_URL = `/proxy/gemini/v1beta/models/${GEMINI_VIS_MODEL}:generateContent`;
 const OLLAMA_URL  = 'http://localhost:11434/api/generate';
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';

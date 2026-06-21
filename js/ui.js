@@ -578,8 +578,8 @@ Optionally, you can update the dashboard widgets based on this forecast by addin
 
     chatHistory.push({role: 'assistant', content: reply});
     appendChatMessage('assistant', reply, ['📥 Download PDF']);
-    // Auto-generate downloadable PDF of the forecast
-    generatePDF(`Waste Forecast — ${targetStr}`, reply);
+    // Auto-download detailed research report PDF (not just the chat reply)
+    setTimeout(() => downloadForecastPaper(), 1800);
     updateAILogsWindow('CHAT_AI', `Forecast Paper printed! ${pred.predicted_waste_kg}kg predicted`, 'SUCCESS');
 
     // Auto-save forecast to waste memory (pending actual outcome)
@@ -1165,8 +1165,8 @@ window.autoGrowChat = autoGrowChat;
 window.chatInputKeydown = chatInputKeydown;
 
 // ─── GENERAL PDF GENERATOR ─────────────────────────────────────────
-// Takes any title + markdown content and creates a downloadable HTML file
-// that the user can open in a browser and File → Print → Save as PDF.
+// Takes any title + markdown content, opens a print-ready window, and
+// auto-triggers the browser Save-as-PDF dialog.
 function generatePDF(title, markdownContent) {
   if (!markdownContent) {
     appendChatMessage('assistant', '⚠️ Nothing to export. Ask me something first!');
@@ -1174,9 +1174,10 @@ function generatePDF(title, markdownContent) {
   }
   const dateStr = new Date().toLocaleString();
   const canteen = setupConfig?.canteenName || 'CanteenTycoon';
+
+  // Markdown → HTML
   const escapedContent = markdownContent
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\n/g,'<br>')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
     .replace(/```(\w*)\n?([\s\S]*?)```/g,'<pre><code>$2</code></pre>')
@@ -1184,38 +1185,63 @@ function generatePDF(title, markdownContent) {
     .replace(/^### (.+)$/gm,'<h3>$1</h3>')
     .replace(/^## (.+)$/gm,'<h2>$1</h2>')
     .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^\|(.+)$/gm, (m) => `<tr>${m.split('|').filter(Boolean).map(c=>`<td>${c.trim()}</td>`).join('')}</tr>`)
     .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/\n{2,}/g,'</p><p>');
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/\n/g,'<br>');
 
-  let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>${title} — ${canteen}</title>
 <style>
-body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0f172a;}
-h1{background:#0f172a;color:white;padding:16px 24px;border-radius:8px;font-size:20px;}
-h2{color:#0f172a;border-bottom:3px solid #6366f1;padding-bottom:6px;margin-top:28px;}
-h3{color:#475569;}
-p{line-height:1.7;font-size:14px;color:#334155;}
-li{margin:4px 0 4px 20px;font-size:14px;line-height:1.5;color:#334155;}
-pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:8px;overflow-x:auto;font-size:12px;}
-code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;}
-pre code{background:transparent;padding:0;}
-.meta{color:#64748b;font-size:12px;margin-bottom:24px;font-family:monospace;}
-footer{color:#94a3b8;font-size:11px;text-align:center;margin-top:40px;font-family:monospace;border-top:1px solid #e2e8f0;padding-top:16px;}
-@media print{body{margin:20px auto;}h1{background:#0f172a!important;-webkit-print-color-adjust:exact;}}
+  *{box-sizing:border-box;}
+  body{font-family:'Segoe UI',Arial,sans-serif;max-width:820px;margin:32px auto;padding:0 28px;color:#0f172a;background:#fff;}
+  h1{background:#0f172a;color:#fff;padding:18px 24px;border-radius:8px;font-size:22px;margin:0 0 8px;}
+  h2{color:#0f172a;border-bottom:3px solid #6366f1;padding-bottom:5px;margin-top:32px;font-size:17px;}
+  h3{color:#475569;font-size:15px;margin-top:20px;}
+  p{line-height:1.75;font-size:14px;color:#334155;margin:10px 0;}
+  li{margin:4px 0 4px 24px;font-size:14px;line-height:1.6;color:#334155;}
+  ul,ol{margin:8px 0;}
+  pre{background:#0f172a;color:#e2e8f0;padding:14px 18px;border-radius:8px;overflow-x:auto;font-size:12px;margin:12px 0;}
+  code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:12.5px;}
+  pre code{background:transparent;padding:0;}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px;}
+  td,th{border:1px solid #e2e8f0;padding:6px 10px;text-align:left;}
+  th{background:#f8fafc;font-weight:600;}
+  tr:nth-child(even){background:#f8fafc;}
+  .meta{color:#64748b;font-size:12px;margin-bottom:24px;font-family:monospace;padding:6px 0;border-bottom:1px solid #e2e8f0;}
+  footer{color:#94a3b8;font-size:11px;text-align:center;margin-top:40px;font-family:monospace;border-top:1px solid #e2e8f0;padding-top:16px;}
+  @media print{
+    body{margin:16px auto;}
+    h1{background:#0f172a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    pre{background:#0f172a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @page{margin:20mm;size:A4;}
+  }
 </style></head><body>
 <h1>📄 ${title}</h1>
-<div class="meta">📅 ${dateStr} | 🏫 ${canteen}</div>
+<div class="meta">📅 Generated: ${dateStr} &nbsp;|&nbsp; 🏫 ${canteen}</div>
 <p>${escapedContent}</p>
-<footer>CanteenTycoon AI · CMD_CORE · Generated by Claude 3.5 Sonnet</footer></body></html>`;
+<footer>CanteenTycoon AI &nbsp;·&nbsp; CMD_CORE &nbsp;·&nbsp; Powered by Claude &amp; Gemini</footer>
+<script>window.onload=()=>{window.print();}<\/script>
+</body></html>`;
 
-  const blob = new Blob([html], {type:'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url;
-  const safeTitle = title.replace(/[^a-zA-Z0-9_ ]/g,'').replace(/\s+/g,'_');
-  a.download = `${safeTitle}_${new Date().toISOString().split('T')[0]}.html`;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  terminalLog(`PDF: "${title}" exported ✓`, 'ok');
+  // Open in a new tab and trigger print dialog (Save as PDF)
+  const w = window.open('', '_blank');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  } else {
+    // If popup blocked, fall back to blob download
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeTitle = title.replace(/[^a-zA-Z0-9_ ]/g,'').replace(/\s+/g,'_');
+    a.download = `${safeTitle}_${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    appendChatMessage('assistant', '⚠️ Popup blocked — downloaded as HTML. Open it in your browser and press Ctrl+P → Save as PDF.');
+  }
+  terminalLog(`PDF: "${title}" ready for printing ✓`, 'ok');
 }
 window.generatePDF = generatePDF;
 
