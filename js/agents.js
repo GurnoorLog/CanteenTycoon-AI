@@ -700,7 +700,6 @@ async function triggerAgent2() {
     if(currentPrediction.rescue_needed) {
       terminalLog('AGENT_2: 🚨 AI RECOMMENDS RESCUE — Preparing dispatch message...', 'warn');
       showRescueWindow();
-      enableAgent3();
     }
   } catch(err) {
     terminalLog(`AGENT_2: ERROR — ${err.message}`, 'err');

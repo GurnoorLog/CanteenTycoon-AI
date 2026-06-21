@@ -272,75 +272,7 @@ function updateWidgets() {
   co2.textContent = "Today's CO₂ Offset: " + co2Val.toFixed(1) + 'kg';
 }
 
-function createAgentControlWindow() {
-  const win = document.createElement('div');
-  win.id = 'win-agents';
-  win.className = 'os-window absolute top-20 right-8 w-[260px] z-50';
-  win.innerHTML = `
-    <div class="os-titlebar">
-      <div class="flex items-center gap-2">
-        <span>🤖</span>
-        <span class="font-bold text-[10px] uppercase">AI_AGENT_CONTROL</span>
-      </div>
-      <div class="window-button bg-secondary" onclick="toggleWindow('win-agents')"></div>
-    </div>
-    <div class="p-3 space-y-2">
-      <div style="font-size:10px;font-family:monospace;color:#6b7280;margin-bottom:8px;">
-        MODE: <span id="agent-mode-label" style="color:#10b981;font-weight:bold;">CLOUD</span>
-        &nbsp;|&nbsp;
-        <button onclick="currentMode=currentMode==='cloud'?'local':'cloud';document.getElementById('agent-mode-label').textContent=currentMode.toUpperCase();terminalLog('MODE: Switched to '+currentMode,'ok');"
-          style="font-size:10px;text-decoration:underline;cursor:pointer;background:none;border:none;color:#60a5fa;">
-          toggle
-        </button>
-      </div>
-      <button id="btn-agent1" onclick="triggerAgent1()"
-        style="width:100%;background:#0f172a;color:#10b981;border:2px solid #10b981;padding:8px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;text-align:left;">
-        🧠 AGENT 1: Generate Map
-      </button>
-      <button onclick="triggerAgent2()"
-        style="width:100%;background:#0f172a;color:#f59e0b;border:2px solid #f59e0b;padding:8px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;text-align:left;">
-        ⚡ AGENT 2: Predict Waste
-      </button>
-      <button id="btn-agent3" onclick="triggerAgent3()" disabled
-        style="width:100%;background:#1a1a2e;color:#4b5563;border:2px solid #374151;padding:8px;font-family:monospace;font-size:11px;font-weight:bold;cursor:not-allowed;text-align:left;">
-        🚨 AGENT 3: Rescue Draft
-      </button>
-      <button onclick="showZones=!showZones"
-        style="width:100%;background:#0f172a;color:#60a5fa;border:2px solid #374151;padding:6px;font-family:monospace;font-size:10px;cursor:pointer;text-align:left;">
-        👁 TOGGLE ZONE OVERLAY
-      </button>
-      <hr style="border-color:#374151;margin:6px 0;">
-      <div style="font-size:10px;font-family:monospace;color:#6b7280;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span>AUTO LOOP:</span>
-        <span id="loop-status" style="color:#10b981;font-weight:bold;">STARTING</span>
-        <button onclick="if(nimLoopInterval){stopNIMAutonomousLoop();document.getElementById('loop-status').textContent='PAUSED';document.getElementById('loop-status').style.color='#f59e0b';}else{startNIMAutonomousLoop();document.getElementById('loop-status').textContent='ACTIVE';document.getElementById('loop-status').style.color='#10b981';}" style="font-size:10px;text-decoration:underline;cursor:pointer;background:none;border:none;color:#60a5fa;">toggle</button>
-      </div>
-      <div style="font-size:10px;font-family:monospace;color:#6b7280;margin-bottom:6px;">
-        WEB: <span id="web-count" style="color:#a855f7;">0/${WEB_FETCH_LIMIT}</span> fetches today
-      </div>
-      <button onclick="generateDailySummary()"
-        style="width:100%;background:#0f172a;color:#a855f7;border:2px solid #a855f7;padding:7px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;text-align:left;margin-top:2px;">
-        📋 GENERATE DAILY REPORT
-      </button>
-      <button onclick="downloadSummary()"
-        style="width:100%;background:#0f172a;color:#6b7280;border:2px solid #374151;padding:6px;font-family:monospace;font-size:10px;cursor:pointer;text-align:left;margin-top:2px;">
-        ⬇ DOWNLOAD LAST REPORT
-      </button>
-      <button onclick="(async()=>{const q=prompt('Search the web for:','food shortage school cafeteria');if(q)await fetchWebContext(q,'user_request');document.getElementById('web-count').textContent=nimWebFetchCount+'/${WEB_FETCH_LIMIT}';})();"
-        style="width:100%;background:#0f172a;color:#60a5fa;border:2px solid #60a5fa;padding:6px;font-family:monospace;font-size:10px;cursor:pointer;text-align:left;margin-top:2px;">
-        🌐 MANUAL WEB SEARCH
-      </button>
-    </div>`;
-  document.getElementById('desktop-os').appendChild(win);
-}
-
-function enableAgent3() {
-  const btn = document.getElementById('btn-agent3');
-  if(btn){
-    btn.disabled=false;
-    btn.style.cssText='width:100%;background:#0f172a;color:#ef4444;border:2px solid #ef4444;padding:8px;font-family:monospace;font-size:11px;font-weight:bold;cursor:pointer;text-align:left;';
-  }
-}
+// AI_AGENT_CONTROL removed as requested
 
 async function initDesktopOS() {
   try {
@@ -359,11 +291,8 @@ async function initDesktopOS() {
   spawnAll();
   gameLoop();
 
-  createAgentControlWindow();
-
   toggleWindow('win-simulation');
   toggleWindow('win-terminal');
-  toggleWindow('win-agents');
   toggleWindow('win-chat');
 
   updateWeatherWindow();
