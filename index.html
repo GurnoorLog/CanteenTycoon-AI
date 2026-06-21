@@ -725,9 +725,6 @@
                 <button class="brix-button px-10 py-5 w-full flex items-center justify-center gap-3 text-xl" onclick="showSetupWizard()">
                     Create Your World ✨
                 </button>
-                <button class="brix-button px-10 py-3 w-full flex items-center justify-center gap-2 text-md" style="background: #475569;" onclick="openApiSettings()">
-                    Configure API Keys 🔑
-                </button>
                 <p class="pixel-font text-sm text-slate-400 mt-4">ENGINE_READY_v2.5</p>
             </div>
         </div>
@@ -742,9 +739,6 @@
     <header class="flex justify-between items-center w-full px-md py-xs bg-surface border-b-[3px] border-on-surface sticky top-0 z-50">
         <div class="flex items-center gap-sm">
             <h1 class="font-display-lg text-display-lg text-primary uppercase">CanteenTycoon AI</h1>
-        </div>
-        <div class="flex items-center gap-sm">
-            <button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" onclick="openApiSettings()">settings</button>
         </div>
     </header>
     <main class="relative min-h-[calc(100vh-80px)] w-full flex items-center justify-center p-md overflow-hidden">
@@ -888,52 +882,8 @@
                 <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase hover:bg-primary-container transition-colors" onclick="completeLoading()">
                     Continue to Desktop →
                 </button>
-                <button class="bg-secondary text-white pixel-border py-sm px-4 font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="openApiSettings()">
-                    🔑 Configure Keys
-                </button>
-                <button class="bg-secondary text-white pixel-border py-sm px-4 font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="generateMapAgain()">
-                    ↻ Retry
-                </button>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- API Settings Modal -->
-<div class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center hidden" id="api-settings-modal">
-    <div class="bg-white pixel-border tactile-shadow p-lg max-w-md w-full mx-4">
-        <div class="flex justify-between items-center mb-md">
-            <h3 class="font-headline-md text-headline-md text-deep-slate-navy uppercase">API Configuration</h3>
-            <button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors font-bold text-xl" onclick="closeApiSettings()">close</button>
-        </div>
-        <p class="font-body-md text-xs text-on-surface-variant mb-md leading-relaxed">
-            On Render, all API keys are managed server-side via environment variables. These fields are <strong>only needed for local development</strong>. Keys are saved in localStorage and <em>never sent to the cloud</em>.
-        </p>
-        <div class="space-y-sm">
-            <div>
-                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">🤖 Claude API Key <span class="text-slate-400 font-normal">(Local dev only)</span></label>
-                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="sk-ant-api03-..." type="password" id="input-api-claude"/>
-                <p class="text-[10px] text-slate-400 mt-1">Powers all AI: intent routing, wizard, forecasting, chat. Get one at console.anthropic.com</p>
-            </div>
-            <div>
-                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">📷 Gemini API Key <span class="text-slate-400 font-normal">(Local dev only)</span></label>
-                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="AIzaSy..." type="password" id="input-api-gemini"/>
-            </div>
-            <div>
-                <label class="block font-label-md text-xs text-deep-slate-navy uppercase mb-xs">📱 Google Client ID <span class="text-slate-400 font-normal">(Sign-In + Calendar)</span></label>
-                <input class="w-full pixel-border p-sm font-mono text-xs focus:ring-0 focus:border-primary" placeholder="xxx.apps.googleusercontent.com" type="text" id="input-api-google"/>
-            </div>
-        </div>
-        <div class="mt-lg flex gap-2">
-            <button class="flex-1 bg-primary text-white pixel-border py-sm font-label-lg uppercase hover:bg-primary-container transition-colors" onclick="saveApiSettings()">
-                Save Keys
-            </button>
-            <button class="bg-secondary text-white pixel-border px-4 py-sm font-label-lg uppercase hover:bg-secondary-container transition-colors" onclick="closeApiSettings()">
-                Cancel
-            </button>
-        </div>
-        <!-- Legacy hidden field for NIM compatibility -->
-        <input type="hidden" id="input-api-nvidia" value=""/>
     </div>
 </div>
 
@@ -1616,9 +1566,6 @@
                 <div class="w-8 h-8 border-2 border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-500 hover:to-purple-500 hover:text-white transition-all cursor-pointer flex items-center justify-center shadow-[2px_2px_0px_0px_#6366f1]" onclick="toggleWindow('win-chat')" title="CMD_CORE — AI Assistant" id="dock-chat-btn">
                     <i data-lucide="brain-circuit" class="w-4 h-4 text-indigo-600 group-hover:text-white"></i>
                 </div>
-                <div class="w-8 h-8 border-2 border-deep-slate-navy bg-surface-container hover:bg-primary hover:text-white transition-colors cursor-pointer flex items-center justify-center" onclick="openApiSettings()" title="API Configuration">
-                    <i data-lucide="key" class="w-4 h-4"></i>
-                </div>
             </div>
         </div>
         <div class="flex items-center gap-6">
@@ -2053,18 +2000,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
     // API CONFIGURATION SETTINGS
     // ============================================================
 
-    function openApiSettings() {
-        // Pre-populate keys
-        document.getElementById('input-api-gemini').value = GEMINI_API_KEY || '';
-        document.getElementById('input-api-claude').value = CLAUDE_API_KEY || '';
-        document.getElementById('input-api-google').value = localStorage.getItem('ct_google_client_id') || '';
-        document.getElementById('api-settings-modal').classList.remove('hidden');
-    }
-
-    function closeApiSettings() {
-        document.getElementById('api-settings-modal').classList.add('hidden');
-    }
-
     // Skip directly to desktop OS if setup was previously completed
     function skipToDesktop() {
         document.getElementById('welcome-gate')?.classList.add('hidden');
@@ -2076,34 +2011,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
     window.skipToDesktop = skipToDesktop;
-
-    function saveApiSettings() {
-        const geminiVal = document.getElementById('input-api-gemini').value.trim();
-        const claudeVal = document.getElementById('input-api-claude').value.trim();
-        const googleVal = document.getElementById('input-api-google').value.trim();
-
-        // Save to localStorage
-        localStorage.setItem('ct_gemini_key', geminiVal);
-        localStorage.setItem('ct_claude_key', claudeVal);
-        localStorage.setItem('ct_google_client_id', googleVal);
-
-        // Update module-scoped variables only (no window.* globals)
-        GEMINI_API_KEY = geminiVal;
-        CLAUDE_API_KEY = claudeVal;
-        GOOGLE_CLIENT_ID = googleVal;
-
-        closeApiSettings();
-        initGoogleSignIn();
-
-        // Show toast
-        const toast = document.getElementById('global-toast');
-        if(toast) {
-            document.getElementById('toast-title').textContent = '🔑 Configuration Saved';
-            document.getElementById('toast-message').textContent = 'API keys updated. Claude is now active.';
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 2500);
-        }
-    }
 
     // ── Google unified sign-in + permissions ──────────────────────
     // Consent popup ONLY via startGoogleAuth() — never on page load.
@@ -2172,8 +2079,6 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
                 fill('input-' + d, v);
             }
         }
-        fill('input-api-claude', localStorage.getItem('ct_claude_key') || '');
-        fill('input-api-gemini', localStorage.getItem('ct_gemini_key') || '');
     }
 
     function applyGoogleUserToUI(payload) {
@@ -2240,7 +2145,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
     function startGoogleAuth() {
         const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
-        if (!cid) { document.getElementById('gsi-error').textContent = 'Google Client ID not configured. Add it in API Settings.'; document.getElementById('gsi-error').classList.remove('hidden'); return; }
+        if (!cid) { document.getElementById('gsi-error').textContent = 'Google Client ID not configured on server.'; document.getElementById('gsi-error').classList.remove('hidden'); return; }
         if (typeof google === 'undefined' || !google.accounts?.oauth2) { document.getElementById('gsi-error').textContent = 'Google library not loaded yet. Try again.'; document.getElementById('gsi-error').classList.remove('hidden'); return; }
         google.accounts.oauth2.initTokenClient({
             client_id: cid,
@@ -2273,7 +2178,7 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         const clientId = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
         restoreGoogleSession();
         if (!clientId) {
-            gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Configure your Google OAuth client ID in <a class="text-primary underline" href="#" onclick="openApiSettings();return false;">API Settings</a> to enable sign-in.</p>';
+            gsiContainer.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant uppercase">🔑 Google Sign-In</p><p class="font-body-md text-sm text-on-surface-variant mt-xs">Google Client ID loaded from server. Sign in below.</p>';
             if (!window._gsiRetried) { window._gsiRetried = true; setTimeout(initGoogleSignIn, 2000); }
             return;
         }
