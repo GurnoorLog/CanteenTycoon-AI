@@ -1539,31 +1539,31 @@
         </div>
     </div>
     <!-- TASKBAR / DOCK -->
-    <nav class="taskbar fixed bottom-0 left-0 w-full flex items-center px-4 justify-between">
-        <!-- START MENU OVERLAY -->
-        <div class="start-overlay hidden" id="start-overlay" onclick="closeStartMenu()"></div>
-        <!-- START MENU POPUP -->
-        <div class="start-menu hidden" id="start-menu">
-            <div class="start-search">
-                <span>🔍</span>
-                <input type="text" id="start-search-input" placeholder="Search apps..." oninput="filterStartApps(this.value)" autocomplete="off">
-            </div>
-            <div class="start-apps" id="start-apps"></div>
-            <div class="start-footer">
-                <div class="start-user" id="start-user-section" onclick="event.stopPropagation()">
-                    <div class="start-user-avatar" id="start-user-avatar">?</div>
-                    <div>
-                        <div class="font-bold text-[11px]" id="start-user-name">User</div>
-                        <div class="text-[9px] opacity-60 font-mono" id="start-user-email"></div>
-                    </div>
+    <!-- START MENU OVERLAY -->
+    <div class="start-overlay hidden" id="start-overlay" onclick="closeStartMenu()"></div>
+    <!-- START MENU POPUP (outside taskbar so z-index works independently) -->
+    <div class="start-menu hidden" id="start-menu">
+        <div class="start-search">
+            <span>🔍</span>
+            <input type="text" id="start-search-input" placeholder="Search apps..." oninput="filterStartApps(this.value)" autocomplete="off">
+        </div>
+        <div class="start-apps" id="start-apps"></div>
+        <div class="start-footer">
+            <div class="start-user" id="start-user-section" onclick="event.stopPropagation()">
+                <div class="start-user-avatar" id="start-user-avatar">?</div>
+                <div>
+                    <div class="font-bold text-[11px]" id="start-user-name">User</div>
+                    <div class="text-[9px] opacity-60 font-mono" id="start-user-email"></div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <div class="start-signout-btn" onclick="signOutGoogle()" title="Sign out">
-                        <span>🚪</span> Sign out
-                    </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="start-signout-btn" onclick="signOutGoogle()" title="Sign out">
+                    <span>🚪</span> Sign out
                 </div>
             </div>
         </div>
+    </div>
+    <nav class="taskbar fixed bottom-0 left-0 w-full flex items-center px-4 justify-between">
         <div class="flex items-center gap-4 h-full">
             <button class="bg-deep-slate-navy text-white px-4 h-8 flex items-center gap-2 font-bold text-xs uppercase border-2 border-white shadow-[2px_2px_0px_0px_#0f172a] rounded-md hover:bg-primary transition-all" onclick="toggleStartMenu()" id="system-btn">
                 <div class="w-3 h-3 bg-primary-fixed-dim rounded-sm"></div>

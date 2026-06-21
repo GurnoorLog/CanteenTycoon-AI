@@ -368,11 +368,11 @@ async function generateCafeteriaImage(userPhotoB64) {
   }
   terminalLog(`GEMINI: Generating pixel art map using ${GEMINI_IMG_MODEL}...`, 'run');
 
-  const style = `Modern pixel art, strict orthographic top-down bird's-eye view (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit palette, bright warm colors, game-ready like Stardew Valley top-down view.`;
+  const style = `Strict orthographic top-down (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit pixel art palette like a retro game, bright warm colors.`;
   const layout = userPhotoB64
-    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo.`
+    ? `EDIT this EXACT photo into pixel art. Do NOT invent a different layout. Keep EVERY table, chair, counter, door, and wall exactly where it is in the photo — same positions, same spacing, same proportions. Only change the rendering: walls become thick border tiles, tables become flat rectangles, chairs become small squares, serving counter becomes a long horizontal strip, floor becomes checkered tiles. The output cafeteria must be identical in layout to the photo, just re-styled as pixel art.`
     : `School cafeteria: wall borders, serving counter along north wall with food trays, 4 rows of dining tables with chairs, 2 trash bins near south-east, small kitchen area north-west, entrance door south, checkered floor.`;
-  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only.`;
+  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only. CRITICAL: Keep the EXACT same spatial layout as the input photo — do not move or rearrange anything.`;
 
   const parts = [];
   if(userPhotoB64) {
