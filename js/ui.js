@@ -1917,6 +1917,7 @@ function startSimulatedDay() {
   const dayName = document.getElementById('pred-paper-simulate-btn')?.textContent?.replace('▶ Simulate ', '') || 'today';
   simulatingPredictedDay = true;
   simulatedDayLabel = dayName;
+  hasPredictionForToday = true; // forecast flow sets currentPrediction but not this flag
 
   // Apply NPC risk scaling from this prediction
   if (window.students && students.length > 0) {
