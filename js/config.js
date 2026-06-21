@@ -28,7 +28,7 @@ let GOOGLE_CLIENT_ID = localStorage.getItem('ct_google_client_id') || '';
 })();
 
 const CLAUDE_MODEL     = 'claude-sonnet-4-5';
-const GEMINI_IMG_MODEL = 'gemini-2.0-flash-preview-image-generation';
+const GEMINI_IMG_MODEL = 'gemini-2.5-flash-image';
 const GEMINI_VIS_MODEL = 'gemini-1.5-flash';
 const IMAGEN_MODEL     = 'imagen-3.0-generate-002';
 

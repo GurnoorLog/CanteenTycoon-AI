@@ -460,22 +460,25 @@ function extractGeminiImage(d) {
   return null;
 }
 
-/** Generate cafeteria pixel-art via Imagen 3 */
+/** Generate cafeteria pixel-art via Gemini 2.5 Flash Image (fallback — no reference photo) */
 async function generateWithImagen(userPhotoB64, ctrl) {
-  terminalLog(`GEMINI: Generating pixel art with Imagen 3...`, 'run');
+  terminalLog(`GEMINI: Generating pixel art directly with ${GEMINI_IMG_MODEL}...`, 'run');
   const prompt = `Modern pixel art school cafeteria, strict orthographic top-down bird's-eye view looking directly straight down with zero perspective, 512×512 pixels, clean 16-bit palette, warm bright colors, game-ready Stardew Valley style. Serving counter along north wall with food trays, 4 rows of long dining tables with chairs, small kitchen area in north-west corner, 2 waste bins near south-east, entrance door on south wall, checkered tile floor. No text, no labels, no UI elements.`;
 
   try {
     const imgCtrl = ctrl || new AbortController();
     const imgTo = ctrl ? null : setTimeout(() => imgCtrl.abort(), 60000);
 
-    const imagenUrl = GEMINI_API_KEY ? `${IMAGEN_URL}?key=${GEMINI_API_KEY}` : IMAGEN_URL;
-    const res = await fetch(imagenUrl, {
+    const fallbackUrl = GEMINI_API_KEY ? `${GEMINI_URL}?key=${GEMINI_API_KEY}` : GEMINI_URL;
+    const res = await fetch(fallbackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: '1:1' }
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          temperature: 1.0
+        }
       }),
       signal: imgCtrl.signal
     });
@@ -484,22 +487,22 @@ async function generateWithImagen(userPhotoB64, ctrl) {
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
       try { const e = await res.json(); errMsg = e.error?.message || JSON.stringify(e).substring(0, 200); } catch(_) {}
-      terminalLog(`IMAGEN: Error -- ${errMsg}. Using procedural fallback.`, 'warn');
+      terminalLog(`GEMINI: Fallback error -- ${errMsg}. Using procedural fallback.`, 'warn');
       return null;
     }
 
     const d = await res.json();
-    const pred = d.predictions?.[0];
-    if (pred?.bytesBase64Encoded) {
-      terminalLog('IMAGEN: Pixel art generated successfully v', 'ok');
-      return `data:image/png;base64,${pred.bytesBase64Encoded}`;
+    const img = extractGeminiImage(d);
+    if (img) {
+      terminalLog('GEMINI: Fallback image generated successfully v', 'ok');
+      return img;
     }
-    terminalLog('IMAGEN: No image bytes in response. Using procedural fallback.', 'warn');
+    terminalLog('GEMINI: Fallback returned no image. Using procedural fallback.', 'warn');
     return null;
 
   } catch(e) {
-    if (e.name === 'AbortError') terminalLog('IMAGEN: Timed out -- using procedural fallback', 'warn');
-    else terminalLog(`IMAGEN: ${e.message} -- using procedural fallback`, 'warn');
+    if (e.name === 'AbortError') terminalLog('GEMINI: Fallback timed out -- using procedural fallback', 'warn');
+    else terminalLog(`GEMINI: Fallback ${e.message} -- using procedural fallback`, 'warn');
     return null;
   }
 }
