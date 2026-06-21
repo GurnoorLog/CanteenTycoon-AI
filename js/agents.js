@@ -368,11 +368,11 @@ async function generateCafeteriaImage(userPhotoB64) {
   }
   terminalLog(`GEMINI: Generating pixel art map using ${GEMINI_IMG_MODEL}...`, 'run');
 
-  const style = `Modern pixel art, strict orthographic top-down bird's-eye view (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit palette, bright warm colors, game-ready like Stardew Valley top-down view.`;
+  const style = `Edit this photo into pixel art style, strict orthographic top-down bird's-eye view (looking straight down). 512x512 pixels.`;
   const layout = userPhotoB64
-    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo.`
+    ? `Edit the uploaded photo into pixel art, top-down view. Keep the same layout, same tables, same objects — just convert to pixel art.`
     : `School cafeteria: wall borders, serving counter along north wall with food trays, 4 rows of dining tables with chairs, 2 trash bins near south-east, small kitchen area north-west, entrance door south, checkered floor.`;
-  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only.`;
+  const quality = `Top-down pixel art. Flat colors. No 3D.`;
 
   const parts = [];
   if(userPhotoB64) {
@@ -394,7 +394,7 @@ async function generateCafeteriaImage(userPhotoB64) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         contents:[{parts}],
-        generationConfig:{responseModalities:['IMAGE','TEXT']}
+        generationConfig:{responseModalities:['IMAGE','TEXT'],seed:Math.floor(Math.random()*99999)+1}
       }),
       signal: ctrl.signal
     });

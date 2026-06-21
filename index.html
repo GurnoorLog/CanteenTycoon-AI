@@ -1664,6 +1664,7 @@
         shelterName: '',
         shelterEmail: '',
         cafeteriaPhoto: null,
+        cafeteriaPhotoB64: null,
         googleUser: null
     };
 
@@ -1727,7 +1728,7 @@
         }
     }
 
-    function finishSetup() {
+    async function finishSetup() {
         const errEl = document.getElementById('card-4-error') || (()=>{const e=document.createElement('p');e.id='card-4-error';e.style.cssText='color:#ef4444;font-size:12px;font-weight:bold;margin-top:8px;text-align:center;';const c4=document.querySelector('#card-4 .flex-grow');if(c4)c4.appendChild(e);return e;})();
         const name = (document.getElementById('input-manager')?.value || '').trim();
         const contact = (document.getElementById('input-contact')?.value || '').trim();
@@ -1760,6 +1761,10 @@
         setupConfig.shelterEmail = (document.getElementById('input-shelter-email')?.value || '').trim();
         setupConfig.cafeteriaPhoto = photoInput.files[0];
         setupConfig.wizardComplete = true;
+
+        // Persist photo as base64 (File objects can't be serialized to localStorage)
+        uploadedPhotoB64 = await fileToBase64(photoInput.files[0]);
+        setupConfig.cafeteriaPhotoB64 = uploadedPhotoB64;
 
         // Save config per Google user (for auto-restore on next sign-in)
         const googleEmail = setupConfig?.googleUser?.email;
@@ -1804,8 +1809,12 @@
         try {
             updateLoadingBar(40, GEMINI_API_KEY ? 'Connecting to Gemini AI...' : 'Generating procedural cafeteria map...', 0.6);
 
-            if(setupConfig.cafeteriaPhoto && !uploadedPhotoB64) {
-                uploadedPhotoB64 = await fileToBase64(setupConfig.cafeteriaPhoto);
+            if(!uploadedPhotoB64) {
+                if(setupConfig.cafeteriaPhotoB64) {
+                    uploadedPhotoB64 = setupConfig.cafeteriaPhotoB64;
+                } else if(setupConfig.cafeteriaPhoto) {
+                    uploadedPhotoB64 = await fileToBase64(setupConfig.cafeteriaPhoto);
+                }
             }
 
             updateLoadingBar(60, 'Generating pixel-art cafeteria map...', 0.8);
@@ -1865,6 +1874,7 @@
     }
 
     async function generateMapAgain() {
+        uploadedPhotoB64 = null;
         document.getElementById('loading-overlay')?.classList.remove('hidden');
         const stage2 = document.getElementById('loading-stage-2');
         stage2.classList.add('hidden');
@@ -3047,7 +3057,10 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         setupConfig.shelterName = g('settings-shelter').value.trim();
         setupConfig.shelterEmail = g('settings-shelter-email').value.trim();
         const photoFile = g('settings-photo').files?.[0];
-        if (photoFile) setupConfig.cafeteriaPhoto = photoFile;
+        if (photoFile) {
+            setupConfig.cafeteriaPhoto = photoFile;
+            fileToBase64(photoFile).then(b64 => { setupConfig.cafeteriaPhotoB64 = b64; }).catch(() => {});
+        }
         const email = setupConfig?.googleUser?.email;
         if (email) {
             const saveable = { ...setupConfig, cafeteriaPhoto: null, googleUser: null };
