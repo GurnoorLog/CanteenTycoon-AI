@@ -545,6 +545,54 @@
         border-color: #ef4444;
         color: #dc2626;
     }
+    .start-user-dropdown {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        width: 100%;
+        background: white;
+        border: 2px solid #0f172a;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 0 0 #0f172a;
+        z-index: 210;
+        overflow: hidden;
+        animation: dropUp 0.2s ease;
+    }
+    @keyframes dropUp {
+        from { transform: translateY(10px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .start-user-dropdown .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        border-bottom: 1px solid #e2e8f0;
+        transition: background 0.1s;
+    }
+    .start-user-dropdown .dropdown-item:hover { background: #eef2ff; }
+    .start-user-dropdown .dropdown-item:last-child { border-bottom: none; }
+    .start-user-dropdown .dropdown-item .mini-avatar {
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        border: 2px solid #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+    .start-user-dropdown .add-account {
+        color: #6366f1;
+        font-weight: 700;
+    }
+    .start-user-dropdown .dropdown-signout {
+        color: #ef4444;
+    }
     .start-overlay {
         position: fixed;
         inset: 0;
@@ -1548,16 +1596,19 @@
             <input type="text" id="start-search-input" placeholder="Search apps..." oninput="filterStartApps(this.value)" autocomplete="off">
         </div>
         <div class="start-apps" id="start-apps"></div>
-        <div class="start-footer">
-            <div class="start-user" id="start-user-section" onclick="event.stopPropagation()">
+        <div class="start-footer" style="position:relative;">
+            <div class="start-user" id="start-user-section" onclick="toggleUserMenu(event)">
                 <div class="start-user-avatar" id="start-user-avatar">?</div>
                 <div>
                     <div class="font-bold text-[11px]" id="start-user-name">User</div>
                     <div class="text-[9px] opacity-60 font-mono" id="start-user-email"></div>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <div class="start-signout-btn" onclick="signOutGoogle()" title="Sign out">
+            <div class="start-user-dropdown hidden" id="start-user-dropdown">
+                <div class="dropdown-item add-account" onclick="addGoogleAccount()">
+                    <span>➕</span> Add another account
+                </div>
+                <div class="dropdown-item dropdown-signout" onclick="signOutGoogle()">
                     <span>🚪</span> Sign out
                 </div>
             </div>
@@ -2670,12 +2721,68 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
         }
     }
 
+    function toggleUserMenu(e) {
+        e.stopPropagation();
+        const dropdown = document.getElementById('start-user-dropdown');
+        if (!dropdown) return;
+        if (dropdown.classList.contains('hidden')) {
+            // Build account list
+            let html = '';
+            if (setupConfig?.googleUser?.email) {
+                const u = setupConfig.googleUser;
+                const initial = (u.name || u.email)[0].toUpperCase();
+                html += `<div class="dropdown-item" onclick="event.stopPropagation();closeStartMenu();">`;
+                html += `<div class="mini-avatar" style="background:${u.picture?'transparent':'#10b981'}">`;
+                if (u.picture) html += `<img src="${u.picture}" style="width:24px;height:24px;border-radius:50%;object-fit:cover">`;
+                else html += initial;
+                html += `</div><div><div style="font-size:11px">${u.name || u.email.split('@')[0]}</div><div style="font-size:9px;opacity:0.6">${u.email}</div></div>`;
+                html += `</div>`;
+            }
+            html += `<div class="dropdown-item add-account" onclick="event.stopPropagation();addGoogleAccount()">`;
+            html += `<span>➕</span> Add another account`;
+            html += `</div>`;
+            html += `<div class="dropdown-item dropdown-signout" onclick="event.stopPropagation();signOutGoogle()">`;
+            html += `<span>🚪</span> Sign out`;
+            html += `</div>`;
+            dropdown.innerHTML = html;
+            dropdown.classList.remove('hidden');
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', closeUserMenu, { once: true });
+            }, 10);
+        } else {
+            dropdown.classList.add('hidden');
+        }
+    }
+
+    function closeUserMenu() {
+        const dropdown = document.getElementById('start-user-dropdown');
+        if (dropdown) dropdown.classList.add('hidden');
+    }
+
+    function addGoogleAccount() {
+        closeStartMenu();
+        const cid = localStorage.getItem('ct_google_client_id') || GOOGLE_CLIENT_ID || '';
+        if (!cid || typeof google === 'undefined' || !google.accounts?.oauth2) {
+            if (typeof terminalLog === 'function') terminalLog('GOOGLE: Configure Google Client ID in API settings first', 'err');
+            return;
+        }
+        // Force account picker with select_account prompt
+        google.accounts.oauth2.initTokenClient({
+            client_id: cid,
+            scope: GOOGLE_SCOPES,
+            prompt: 'select_account',
+            callback: onGoogleTokenResponse
+        }).requestAccessToken();
+    }
+
     // ============================================================
     // SIGN OUT
     // ============================================================
 
     function signOutGoogle() {
         closeStartMenu();
+        closeUserMenu();
         // Revoke token if possible
         if (window.__googleAccessToken && typeof google !== 'undefined' && google.accounts?.oauth2?.revoke) {
             try { google.accounts.oauth2.revoke(window.__googleAccessToken, () => {}); } catch(e) {}
