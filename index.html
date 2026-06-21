@@ -1883,6 +1883,7 @@
     }
 
     async function generateMapAgain() {
+        document.getElementById('loading-overlay')?.classList.remove('hidden');
         const stage2 = document.getElementById('loading-stage-2');
         stage2.classList.add('hidden');
         document.getElementById('loading-stage-1').classList.remove('hidden');
@@ -2240,6 +2241,8 @@ Are you ready to proceed? Type "yes" to start generating your cafeteria map!`);
 
         applyGoogleUserToUI(payload);
         console.log('[Google] Signed in as', payload.email, '| Gmail+Calendar token saved');
+        // Reset wizardComplete so new accounts see the wizard (restoreConfigForUser will re-set if they completed)
+        setupConfig.wizardComplete = false;
         restoreConfigForUser(payload.email, payload);
 
         if (setupConfig.wizardComplete) { setTimeout(skipToDesktop, 500); }

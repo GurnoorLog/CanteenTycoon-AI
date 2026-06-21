@@ -370,9 +370,9 @@ async function generateCafeteriaImage(userPhotoB64) {
 
   const style = `Modern pixel art, strict orthographic top-down bird's-eye view (looking straight down, zero perspective, zero isometric angle), 512x512 pixels, clean 16-bit palette, bright warm colors, game-ready like Stardew Valley top-down view.`;
   const layout = userPhotoB64
-    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo.`
+    ? `Transform this uploaded school cafeteria photo into top-down pixel art. Keep real spatial layout. Convert: walls to border tiles, tables to flat rectangles, chairs to small squares around tables, serving counter to long horizontal strip, floor to checkered tiles. Same relative positions as photo. Style variation ${Math.floor(Math.random()*9999)}.`
     : `School cafeteria: wall borders, serving counter along north wall with food trays, 4 rows of dining tables with chairs, 2 trash bins near south-east, small kitchen area north-west, entrance door south, checkered floor.`;
-  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only.`;
+  const quality = `Tables are flat rectangles. Chairs are small squares. Counter is long horizontal element. Floor is tile pattern. NO diagonal perspective. NO 3D. Pure orthographic top-down only. Variation seed: ${Math.floor(Math.random()*9999)}.`;
 
   const parts = [];
   if(userPhotoB64) {
